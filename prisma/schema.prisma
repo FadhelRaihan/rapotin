@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id         String      @id @default(uuid())
+  name       String
+  npsn       String?
+  address    String?
+  created_at DateTime    @default(now())
+  teachers   Teacher[]
+  classrooms Classroom[]
+
+  @@map("schools")
+}
+
+model Teacher {
+  id         String      @id @default(uuid())
+  school_id  String
+  name       String
+  nip        String?
+  pin_hash   String
+  created_at DateTime    @default(now())
+
+  school     School      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  classrooms Classroom[]
+
+  @@map("teachers")
+}
+
+model Classroom {
+  id            String   @id @default(uuid())
+  school_id     String
+  teacher_id    String
+  name          String
+  academic_year String
+  created_at    DateTime @default(now())
+
+  school   School    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher  Teacher   @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  students Student[]
+  subjects Subject[]
+
+  @@map("classrooms")
+}
+
+model Student {
+  id           String   @id @default(uuid())
+  classroom_id String
+  nis          String
+  nisn         String?
+  full_name    String
+  gender       String?  // "L" atau "P"
+  created_at   DateTime @default(now())
+
+  classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
+  assignment_scores AssignmentScore[]
+  daily_test_scores DailyTestScore[]
+
+  @@map("students")
+}
+
+model Subject {
+  id           String   @id @default(uuid())
+  classroom_id String
+  name         String
+  created_at   DateTime @default(now())
+
+  classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
+  assignment_scores AssignmentScore[]
+  daily_test_scores DailyTestScore[]
+
+  @@map("subjects")
+}
+
+model AssignmentScore {
+  id          String   @id @default(uuid())
+  student_id  String
+  subject_id  String
+  semester    String   // "I" atau "II"
+  label       String
+  score       Decimal? @db.Decimal(5, 2)
+  is_pending  Boolean  @default(false)
+  recorded_at DateTime @db.Date
+  created_at  DateTime @default(now())
+
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@map("assignment_scores")
+}
+
+model DailyTestScore {
+  id                    String   @id @default(uuid())
+  student_id            String
+  subject_id            String
+  semester              String   // "I" atau "II"
+  label                 String
+  score                 Decimal? @db.Decimal(5, 2)
+  is_pending            Boolean  @default(false)
+  multiple_choice_count Int?     @default(0)
+  essay_count           Int?     @default(0)
+  recorded_at           DateTime @db.Date
+  created_at            DateTime @default(now())
+
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@map("daily_test_scores")
+}
