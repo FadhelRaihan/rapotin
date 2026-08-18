@@ -13,6 +13,8 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: 'Inter', 'Geist', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .data-tabular {
@@ -24,7 +26,7 @@ body {
 }
 
 .hairline-border {
-  border: 1px solid #E5E7EB;
+  border: 1px solid #CBD5E1;
 }
 
 /* Utility to hide scrollbars globally while maintaining full scrollability */

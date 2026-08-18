@@ -247,27 +247,27 @@ export function RecapTable() {
       {/* Main Data Panel */}
       <Card className="p-0 overflow-hidden border border-[#E5E7EB] rounded-2xl bg-white shadow-sm">
         {/* Search & Legend Bar */}
-        <div className="p-4 border-b border-[#E5E7EB] flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-[#F8FAFC]">
-          <div className="relative w-full lg:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+        <div className="p-4 border-b border-slate-300 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-slate-50">
+          <div className="relative w-full lg:w-80">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               placeholder="Cari siswa atau NIS..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-[#E5E7EB] rounded-md text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent transition-all"
+              className="w-full h-10 pl-10 pr-4 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#7C3AED] transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-[#6B7280] font-medium">
+          <div className="flex items-center gap-4 text-xs text-slate-700 font-bold">
             {(scoreType === 'DEFAULT' || scoreType === 'ASSIGNMENT') && (
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#7C3AED]"></span> T / RT = Rata-Rata Tugas (Hover kolom untuk info)
+                <span className="w-2.5 h-2.5 rounded-full bg-[#7C3AED]"></span> T / RT = Rata-Rata Tugas
               </span>
             )}
             {(scoreType === 'DEFAULT' || scoreType === 'DAILY_TEST') && (
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> UH / RUH = Rata-Rata UH (Hover kolom untuk info)
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> UH / RUH = Rata-Rata UH
               </span>
             )}
           </div>
@@ -275,18 +275,18 @@ export function RecapTable() {
 
         {/* Matrix Table Container */}
         <div className="overflow-x-auto relative">
-          <table className="w-full text-left border-collapse text-xs min-w-[700px]">
+          <table className="w-full text-left border-collapse text-sm min-w-[700px]">
             <thead>
-              <tr className="border-b border-[#E5E7EB] bg-[#F8FAFC] font-semibold text-[#6B7280]">
-                <th className="p-3 text-center border-r border-[#E5E7EB] w-10">No</th>
-                <th className="p-3 border-r border-[#E5E7EB] w-28">NIS / NISN</th>
-                <th className="p-3 border-r border-[#E5E7EB] min-w-[180px]">Nama Siswa</th>
-                <th className="p-3 text-center border-r border-[#E5E7EB] w-12">L/P</th>
+              <tr className="border-b border-slate-300 bg-slate-100/90 font-bold text-slate-900">
+                <th className="p-3.5 text-center border-r border-slate-300 w-12 text-sm">No</th>
+                <th className="p-3.5 border-r border-slate-300 w-36 text-sm">NIS / NISN</th>
+                <th className="p-3.5 border-r border-slate-300 min-w-[200px] text-sm">Nama Siswa</th>
+                <th className="p-3.5 text-center border-r border-slate-300 w-14 text-sm">L/P</th>
                 {displayedSubjects.map((subject) => (
                   <th
                     key={subject.id}
                     colSpan={colSpanPerSubject}
-                    className="p-3 text-center border-r border-[#E5E7EB] min-w-[120px]"
+                    className="p-3.5 text-center border-r border-slate-300 min-w-[130px] text-sm"
                   >
                     {subject.name}
                   </th>

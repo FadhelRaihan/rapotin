@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import React, { Suspense } from 'react';
 import { NavigationProgress } from '@/components/ui/navigation-progress';
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -28,6 +29,7 @@ export default function RootLayout({
           <NavigationProgress />
         </Suspense>
         {children}
+        <Toaster />
       </body>
     </html>
   );

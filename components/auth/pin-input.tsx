@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils';
 
 interface PinInputProps {
   length?: number;
+  label?: string;
+  hint?: string;
   onComplete: (pin: string) => void;
   disabled?: boolean;
 }
 
-export function PinInput({ length = 6, onComplete, disabled = false }: PinInputProps) {
+export function PinInput({ length = 6, label, hint, onComplete, disabled = false }: PinInputProps) {
   const [pin, setPin] = useState<string[]>(Array(length).fill(''));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -56,28 +58,40 @@ export function PinInput({ length = 6, onComplete, disabled = false }: PinInputP
   };
 
   return (
-    <div className="flex gap-2.5 sm:gap-3 justify-center my-4">
-      {pin.map((digit, idx) => (
-        <input
-          key={idx}
-          ref={(el) => {
-            inputRefs.current[idx] = el;
-          }}
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={1}
-          value={digit}
-          disabled={disabled}
-          onChange={(e) => handleChange(e, idx)}
-          onKeyDown={(e) => handleKeyDown(e, idx)}
-          onPaste={handlePaste}
-          className={cn(
-            'w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-mono tabular-nums font-bold rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-[#111827] shadow-xs focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent transition-all duration-200',
-            digit && 'border-[#7C3AED] bg-[#F3E8FF] text-[#7C3AED] shadow-sm'
-          )}
-        />
-      ))}
+    <div className="w-full flex flex-col items-center">
+      {label && (
+        <label className="text-sm font-bold text-slate-800 mb-1 text-center">
+          {label}
+        </label>
+      )}
+      {hint && (
+        <p className="text-xs text-slate-600 font-medium mb-2 text-center">
+          {hint}
+        </p>
+      )}
+      <div className="flex gap-2.5 sm:gap-3.5 justify-center my-3">
+        {pin.map((digit, idx) => (
+          <input
+            key={idx}
+            ref={(el) => {
+              inputRefs.current[idx] = el;
+            }}
+            type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={1}
+            value={digit}
+            disabled={disabled}
+            onChange={(e) => handleChange(e, idx)}
+            onKeyDown={(e) => handleKeyDown(e, idx)}
+            onPaste={handlePaste}
+            className={cn(
+              'w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-mono tabular-nums font-bold rounded-2xl border-2 border-slate-300 bg-white text-slate-900 shadow-md focus:outline-none focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/25 transition-all duration-200',
+              digit && 'border-2 border-[#7C3AED] bg-[#F3E8FF] text-[#5B21B6] shadow-md scale-[1.03]'
+            )}
+          />
+        ))}
+      </div>
     </div>
   );
 }

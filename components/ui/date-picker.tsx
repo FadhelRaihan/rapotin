@@ -122,7 +122,7 @@ export function DatePicker({
   return (
     <div className="w-full flex flex-col gap-1.5 relative" ref={containerRef}>
       {label && (
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <label className="text-sm font-bold text-slate-700">
           {label}
         </label>
       )}
@@ -132,54 +132,54 @@ export function DatePicker({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex h-9 w-full items-center justify-between rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-2 text-xs font-semibold text-[#111827] shadow-xs focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent transition-all cursor-pointer',
+          'flex h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent transition-all cursor-pointer',
           error && 'border-rose-500 focus:ring-rose-500',
           className
         )}
       >
-        <span className={cn(selectedDate ? 'text-[#111827]' : 'text-slate-400 font-normal')}>
+        <span className={cn(selectedDate ? 'text-slate-900 font-medium' : 'text-slate-500 font-normal')}>
           {formatDisplay(selectedDate)}
         </span>
-        <CalendarIcon className="h-4 w-4 text-[#7C3AED] opacity-80" />
+        <CalendarIcon className="h-4 w-4 text-[#7C3AED] opacity-90" />
       </button>
 
-      {error && <span className="text-xs text-rose-500 font-medium">{error}</span>}
+      {error && <span className="text-sm text-rose-600 font-semibold">{error}</span>}
 
       {/* Floating Custom Calendar Popover */}
       {isOpen && (
-        <div className="absolute top-full left-0 z-50 mt-1.5 w-72 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-2xl animate-in fade-in-80 zoom-in-95 font-sans">
+        <div className="absolute top-full left-0 z-50 mt-1.5 w-80 rounded-2xl border border-slate-300 bg-white p-4 shadow-2xl animate-in fade-in-80 zoom-in-95 font-sans">
           {/* Calendar Header: Month & Navigation */}
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E5E7EB]">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1 rounded-lg hover:bg-[#F3E8FF] hover:text-[#7C3AED] text-[#6B7280] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-[#F3E8FF] hover:text-[#5B21B6] text-slate-700 transition-colors cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
 
-            <span className="text-xs font-bold text-[#111827]">
+            <span className="text-sm font-bold text-slate-900">
               {MONTH_NAMES_ID[viewMonth]} {viewYear}
             </span>
 
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1 rounded-lg hover:bg-[#F3E8FF] hover:text-[#7C3AED] text-[#6B7280] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-[#F3E8FF] hover:text-[#5B21B6] text-slate-700 transition-colors cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
           {/* Days of Week Header */}
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#6B7280] mb-2 uppercase tracking-wider">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
             {DAY_NAMES_ID.map((dayName) => (
               <span key={dayName}>{dayName}</span>
             ))}
           </div>
 
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center text-xs">
+          <div className="grid grid-cols-7 gap-1 text-center text-sm">
             {/* Empty slots for offset */}
             {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
               <span key={`empty-${idx}`} />
@@ -197,12 +197,12 @@ export function DatePicker({
                   type="button"
                   onClick={() => handleSelectDay(dayNum)}
                   className={cn(
-                    'h-8 w-8 rounded-xl flex items-center justify-center font-medium transition-all cursor-pointer mx-auto text-xs',
+                    'h-9 w-9 rounded-xl flex items-center justify-center font-medium transition-all cursor-pointer mx-auto text-sm',
                     selected
                       ? 'bg-[#7C3AED] text-white font-bold shadow-md shadow-purple-500/20'
                       : todayCurrent
-                      ? 'border border-[#7C3AED] text-[#7C3AED] font-bold bg-[#F3E8FF]/40'
-                      : 'hover:bg-[#F3E8FF] hover:text-[#7C3AED] text-[#111827]'
+                      ? 'border-2 border-[#7C3AED] text-[#5B21B6] font-bold bg-[#F3E8FF]'
+                      : 'hover:bg-[#F3E8FF] hover:text-[#5B21B6] text-slate-900'
                   )}
                 >
                   {dayNum}
@@ -212,11 +212,11 @@ export function DatePicker({
           </div>
 
           {/* Quick Action Footer */}
-          <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#E5E7EB]">
+          <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-200">
             <button
               type="button"
               onClick={handleSelectToday}
-              className="text-[11px] font-bold text-[#7C3AED] hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#7C3AED] hover:underline cursor-pointer"
             >
               Hari Ini
             </button>
@@ -228,7 +228,7 @@ export function DatePicker({
                   if (onChange) onChange('');
                   setIsOpen(false);
                 }}
-                className="text-[11px] font-medium text-rose-600 hover:underline cursor-pointer"
+                className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
               >
                 Hapus Tanggal
               </button>

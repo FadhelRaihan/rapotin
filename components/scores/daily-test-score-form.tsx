@@ -19,9 +19,12 @@ import {
   Filter,
   Clock,
   AlertCircle,
+  Edit2,
+  X,
 } from 'lucide-react';
 import { formatScore, cn } from '@/lib/utils';
 import { validateTaskLabel, validateScoreValue } from '@/lib/validators';
+import { toast } from 'sonner';
 
 export interface Student {
   id: string;
@@ -92,9 +95,76 @@ export function DailyTestScoreForm({
   // Pending Scores Edit State: score_id -> score string
   const [pendingInputMap, setPendingInputMap] = useState<Record<string, string>>({});
 
+  // History Edit Modal State
+  const [editingHistoryScore, setEditingHistoryScore] = useState<DailyTestScore | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    score: '',
+    label: '',
+    semester: 'I',
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const openEditHistoryModal = (scoreItem: DailyTestScore) => {
+    setEditingHistoryScore(scoreItem);
+    setEditFormData({
+      score: scoreItem.score !== null && scoreItem.score !== undefined ? String(scoreItem.score) : '',
+      label: scoreItem.label,
+      semester: scoreItem.semester,
+    });
+    setEditError('');
+  };
+
+  const handleSaveHistoryEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHistoryScore) return;
+
+    setEditLoading(true);
+    setEditError('');
+
+    try {
+      const numScore = editFormData.score.trim() === '' ? null : Number(editFormData.score);
+      if (numScore !== null && (isNaN(numScore) || numScore < 0 || numScore > 100)) {
+        setEditError('Nilai harus berupa angka antara 0 - 100');
+        setEditLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/scores/daily-test/${editingHistoryScore.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          score: numScore,
+          label: editFormData.label,
+          semester: editFormData.semester,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal memperbarui nilai UH');
+      }
+
+      setScores((prev) =>
+        prev.map((s) => (s.id === editingHistoryScore.id ? data.score : s))
+      );
+      setEditingHistoryScore(null);
+      setSuccessMsg('Nilai UH berhasil diperbarui.');
+      toast.success('Nilai UH berhasil diperbarui.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+      router.refresh();
+    } catch (err: any) {
+      const msg = err.message || 'Terjadi kesalahan saat menyimpan perubahan.';
+      setEditError(msg);
+      toast.error(msg);
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   // Handle Label Change with Instant Real-Time Validation
   const handleLabelChange = (val: string) => {
@@ -216,7 +286,9 @@ export function DailyTestScoreForm({
         setScores((prev) => [...data.savedScores, ...prev]);
       }
 
-      setSuccessMsg(`Berhasil menyimpan ${data.filledCount} nilai ulangan harian siswa!`);
+      const successText = `Berhasil menyimpan ${data.filledCount} nilai ulangan harian siswa!`;
+      setSuccessMsg(successText);
+      toast.success(successText);
       setScoreMap({});
       setScoreErrors({});
       setLabelError(null);
@@ -232,7 +304,9 @@ export function DailyTestScoreForm({
       setActiveTab('history');
       router.refresh();
     } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan');
+      const errMsg = err.message || 'Terjadi kesalahan saat menyimpan nilai UH.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -243,7 +317,7 @@ export function DailyTestScoreForm({
     const val = pendingInputMap[scoreId];
     const scoreErr = validateScoreValue(val || '');
     if (scoreErr) {
-      alert(`Nilai susulan UH tidak valid: ${scoreErr}`);
+      toast.error(`Nilai susulan UH tidak valid: ${scoreErr}`);
       return;
     }
 
@@ -270,9 +344,10 @@ export function DailyTestScoreForm({
         return copy;
       });
 
+      toast.success('Nilai susulan UH berhasil disimpan!');
       router.refresh();
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui nilai susulan UH.');
+      toast.error(err.message || 'Gagal memperbarui nilai susulan UH.');
     }
   };
 
@@ -284,10 +359,15 @@ export function DailyTestScoreForm({
       const res = await fetch(`/api/scores/daily-test/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setScores((prev) => prev.filter((s) => s.id !== id));
+        toast.success('Nilai UH berhasil dihapus.');
         router.refresh();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Gagal menghapus nilai UH.');
       }
     } catch (err) {
       console.error('Error deleting score:', err);
+      toast.error('Gagal menghapus nilai UH.');
     }
   };
 
@@ -683,8 +763,17 @@ export function DailyTestScoreForm({
                         <td className="p-4 text-center font-mono tabular-nums font-bold text-sm text-[#7C3AED]">
                           {formatScore(score.score)}
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right flex items-center justify-end gap-1">
                           <button
+                            type="button"
+                            onClick={() => openEditHistoryModal(score)}
+                            className="p-1.5 text-slate-500 hover:text-[#7C3AED] transition-colors rounded-md hover:bg-purple-50 cursor-pointer"
+                            title="Edit Data Nilai"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDelete(score.id)}
                             className="p-1.5 text-[#6B7280] hover:text-rose-600 transition-colors rounded-md hover:bg-rose-50 cursor-pointer"
                             title="Hapus Nilai"
@@ -796,6 +885,83 @@ export function DailyTestScoreForm({
             </table>
           </div>
         </Card>
+      )}
+
+      {/* Modal Edit History Score */}
+      {editingHistoryScore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
+          <div className="bg-white border border-slate-300 rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl animate-in fade-in-90 zoom-in-95 font-sans">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-[#7C3AED]" />
+                Edit Data Nilai Ulangan Harian (UH)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingHistoryScore(null)}
+                className="text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 mb-4 text-xs font-bold bg-rose-50 border border-rose-300 text-rose-700 rounded-xl">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveHistoryEdit} className="flex flex-col gap-4">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-300 flex flex-col gap-1">
+                <span className="text-xs text-slate-600 font-medium">Siswa:</span>
+                <strong className="text-base font-bold text-slate-900">
+                  {editingHistoryScore.student?.full_name || '-'}
+                </strong>
+                <span className="text-xs text-slate-600 font-medium mt-1">Mata Pelajaran:</span>
+                <strong className="text-sm font-bold text-[#7C3AED]">
+                  {editingHistoryScore.subject?.name || '-'}
+                </strong>
+              </div>
+
+              <Input
+                label="Judul / Label UH *"
+                value={editFormData.label}
+                onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
+                required
+              />
+
+              <Select
+                label="Semester *"
+                value={editFormData.semester}
+                onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
+                options={[
+                  { value: 'I', label: 'Semester I' },
+                  { value: 'II', label: 'Semester II' },
+                ]}
+              />
+
+              <Input
+                label="Nilai UH (0 - 100)"
+                placeholder="Kosongkan jika belum ada nilai"
+                value={editFormData.score}
+                onChange={(e) => setEditFormData({ ...editFormData, score: e.target.value })}
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+              />
+
+              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
+                <Button type="button" variant="outline" onClick={() => setEditingHistoryScore(null)}>
+                  Batal
+                </Button>
+                <Button type="submit" disabled={editLoading}>
+                  {editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -20,13 +20,24 @@ export async function PUT(
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
+    const { score, label, semester } = validation.data;
+
+    const updateData: any = {};
+    if (score !== undefined) {
+      updateData.score = score;
+      updateData.is_pending = score === null;
+    }
+    if (label !== undefined) {
+      updateData.label = label;
+    }
+    if (semester !== undefined) {
+      updateData.semester = semester;
+    }
+
     const updated = await withDbRetry(() =>
       db.assignmentScore.update({
         where: { id },
-        data: {
-          score: validation.data.score,
-          is_pending: false,
-        },
+        data: updateData,
         include: {
           student: true,
           subject: true,
@@ -36,7 +47,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      message: 'Nilai susulan berhasil disimpan.',
+      message: 'Nilai tugas berhasil diperbarui.',
       score: updated,
     });
   } catch (error: any) {

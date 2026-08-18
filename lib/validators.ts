@@ -35,8 +35,8 @@ export const studentInputSchema = z.object({
     .optional()
     .nullable()
     .refine(
-      (val) => !val || (val.length >= 8 && val.length <= 20 && ALPHANUM_REGEX.test(val)),
-      { message: 'NISN harus berupa 8-20 karakter alfanumerik jika diisi' }
+      (val) => !val || /^\d{10}$/.test(val),
+      { message: 'NISN harus berupa 10 digit angka jika diisi' }
     ),
   full_name: z
     .string()
@@ -147,7 +147,17 @@ export const updateSingleScoreSchema = z.object({
   score: z
     .number({ invalid_type_error: 'Nilai harus berupa angka' })
     .min(0, 'Nilai minimal adalah 0')
-    .max(100, 'Nilai maksimal adalah 100'),
+    .max(100, 'Nilai maksimal adalah 100')
+    .nullable()
+    .optional(),
+  label: z
+    .string()
+    .trim()
+    .min(2, 'Nama / Label minimal 2 karakter')
+    .max(100, 'Nama / Label maksimal 100 karakter')
+    .regex(LABEL_REGEX, 'Label tidak boleh berisi karakter khusus tak valid (seperti ";", "[", "]")')
+    .optional(),
+  semester: z.enum(['I', 'II']).optional(),
 });
 
 /**
@@ -186,5 +196,13 @@ export function validateNis(val: string): string | null {
   if (trimmed.length < 3) return 'NIS minimal 3 karakter';
   if (trimmed.length > 30) return 'NIS maksimal 30 karakter';
   if (!NIS_REGEX.test(trimmed)) return 'NIS hanya boleh berisi huruf, angka, (-), atau (/)';
+  return null;
+}
+
+export function validateNisn(val: string): string | null {
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return 'NISN hanya boleh berisi angka';
+  if (trimmed.length !== 10) return 'NISN harus berupa 10 digit angka';
   return null;
 }

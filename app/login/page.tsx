@@ -15,7 +15,10 @@ import {
   School,
   ArrowRight,
   Info,
+  KeyRound,
 } from 'lucide-react';
+
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,9 +38,12 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'PIN yang Anda masukkan salah.');
+        const errMsg = data.error || 'PIN yang Anda masukkan salah.';
+        toast.error(errMsg);
+        throw new Error(errMsg);
       }
 
+      toast.success('Login berhasil! Mengalihkan ke halaman kelas...');
       router.push('/kelas');
       router.refresh();
     } catch (err: any) {
@@ -50,7 +56,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] text-[#111827] flex items-center justify-center p-4 md:p-8 font-sans antialiased">
       {/* Main Container Card */}
-      <div className="w-full max-w-4xl bg-white border border-[#E5E7EB] rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
+      <div className="w-full max-w-4xl bg-white border border-slate-300 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
         {/* Left Side: Hero Brand Showcase */}
         <div className="bg-gradient-to-br from-[#7C3AED] via-[#6D28D9] to-[#4C1D95] p-8 md:p-12 text-white flex flex-col justify-between relative overflow-hidden">
           {/* Subtle background decoration */}
@@ -110,27 +116,48 @@ export default function LoginPage() {
 
         {/* Right Side: PIN Verification Form */}
         <div className="p-8 md:p-12 flex flex-col justify-between gap-6 bg-white">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <div className="w-10 h-10 rounded-xl bg-[#F3E8FF] text-[#7C3AED] flex items-center justify-center font-bold mb-1">
                 <Lock className="w-5 h-5" />
               </div>
-              <h2 className="text-xl md:text-2xl font-bold text-[#111827] tracking-tight">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
                 Masuk Akun Guru
               </h2>
-              <p className="text-xs text-[#6B7280]">
+              <p className="text-sm font-medium text-slate-700">
                 Masukkan 6-digit PIN akses untuk melanjutkan ke portal kelas Anda
               </p>
             </div>
 
+            {/* High Visibility PIN Instruction Banner */}
+            <div className="p-3.5 bg-[#F3E8FF]/70 border border-purple-300 rounded-2xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#7C3AED] text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold text-[#5B21B6] uppercase tracking-wider">
+                  Petunjuk Pengisian PIN
+                </span>
+                <span className="text-xs font-bold text-slate-900">
+                  Ketikkan 6 digit angka PIN Anda pada 6 kotak di bawah ini:
+                </span>
+              </div>
+            </div>
+
             {error && (
-              <div className="p-3 text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-xl font-medium">
+              <div className="p-3 text-sm bg-rose-50 border border-rose-300 text-rose-700 rounded-xl font-bold">
                 {error}
               </div>
             )}
 
             <div className="flex flex-col gap-4">
-              <PinInput length={6} onComplete={handleCompletePin} disabled={loading} />
+              <PinInput
+                label="Masukkan 6-Digit PIN Akses Anda"
+
+                length={6}
+                onComplete={handleCompletePin}
+                disabled={loading}
+              />
 
               {loading && (
                 <div className="flex items-center justify-center gap-2 text-xs font-semibold text-[#7C3AED] animate-pulse">

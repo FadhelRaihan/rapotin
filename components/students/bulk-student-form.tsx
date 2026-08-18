@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Plus, Trash2, Save, X } from 'lucide-react';
-import { validateNis, validateStudentName } from '@/lib/validators';
+import { ExcelStudentImport, ExtractedStudent } from '@/components/students/excel-student-import';
+import { FileSpreadsheet, ListPlus, Plus, Trash2, Save, X } from 'lucide-react';
+import { validateNis, validateNisn, validateStudentName } from '@/lib/validators';
+import { toast } from 'sonner';
 
 interface StudentRow {
   nis: string;
@@ -22,6 +24,8 @@ interface BulkStudentFormProps {
 
 export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'excel' | 'form'>('excel');
+
   const [rows, setRows] = useState<StudentRow[]>([
     { nis: '', nisn: '', full_name: '', gender: 'L' },
     { nis: '', nisn: '', full_name: '', gender: 'L' },
@@ -30,11 +34,16 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
     { nis: '', nisn: '', full_name: '', gender: 'L' },
   ]);
 
-  // Real-time cell errors: index -> { nis?: string, full_name?: string }
-  const [cellErrors, setCellErrors] = useState<Record<number, { nis?: string | null; full_name?: string | null }>>({});
+  // Real-time cell errors: index -> { nis?: string, nisn?: string, full_name?: string }
+  const [cellErrors, setCellErrors] = useState<Record<number, { nis?: string | null; nisn?: string | null; full_name?: string | null }>>({});
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleExcelExtracted = (extracted: ExtractedStudent[]) => {
+    setRows(extracted);
+    setActiveTab('form');
+  };
 
   const handleRowChange = (index: number, field: keyof StudentRow, value: string) => {
     const updated = [...rows];
@@ -47,6 +56,13 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
       setCellErrors((prev) => ({ ...prev, [index]: { ...prev[index], nis: err } }));
     } else if (field === 'nis' && value.trim() === '') {
       setCellErrors((prev) => ({ ...prev, [index]: { ...prev[index], nis: null } }));
+    }
+
+    if (field === 'nisn' && value.trim() !== '') {
+      const err = validateNisn(value);
+      setCellErrors((prev) => ({ ...prev, [index]: { ...prev[index], nisn: err } }));
+    } else if (field === 'nisn' && value.trim() === '') {
+      setCellErrors((prev) => ({ ...prev, [index]: { ...prev[index], nisn: null } }));
     }
 
     if (field === 'full_name' && value.trim() !== '') {
@@ -77,11 +93,13 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
 
     // Check if any cell has error
     const hasErrors = Object.values(cellErrors).some(
-      (errs) => errs && (errs.nis || errs.full_name)
+      (errs) => errs && (errs.nis || errs.full_name || errs.nisn)
     );
 
     if (hasErrors) {
-      setError('Harap perbaiki data siswa yang tidak valid sebelum menyimpan.');
+      const msg = 'Harap perbaiki data siswa yang tidak valid sebelum menyimpan.';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -89,7 +107,9 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
     const validRows = rows.filter((r) => r.nis.trim() !== '' && r.full_name.trim() !== '');
 
     if (validRows.length === 0) {
-      setError('Harap isi setidaknya satu data siswa lengkap (NIS dan Nama Lengkap).');
+      const msg = 'Harap isi setidaknya satu data siswa lengkap (NIS dan Nama Lengkap).';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -107,6 +127,7 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
         throw new Error(data.error || 'Gagal menyimpan data siswa');
       }
 
+      toast.success(`Berhasil menyimpan ${validRows.length} data siswa!`);
       if (onSuccess) {
         onSuccess();
       } else {
@@ -114,135 +135,181 @@ export function BulkStudentForm({ onSuccess, onCancel }: BulkStudentFormProps) {
         router.refresh();
       }
     } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan');
+      const msg = err.message || 'Terjadi kesalahan saat menyimpan data siswa.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB]">
+    <div className="flex flex-col gap-5">
+      {/* Modal Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-300">
         <div>
-          <h2 className="text-lg font-bold text-[#111827]">
-            Input Massal Data Siswa (Bulk Add)
+          <h2 className="text-xl font-bold text-slate-900">
+            Tambah Massal Data Siswa
           </h2>
-          <p className="text-xs text-[#6B7280]">
-            Isi data siswa dalam bentuk tabel sekaligus untuk pendaftaran di awal semester
+          <p className="text-sm font-medium text-slate-700 mt-0.5">
+            Unggah file Excel sekolah Anda atau isi form tabel untuk pendaftaran massal siswa
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="secondary" onClick={addRow} size="sm">
-            <Plus className="w-4 h-4" /> Tambah Baris
-          </Button>
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="p-1.5 text-[#6B7280] hover:text-[#111827] rounded-md hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-        </div>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-2 text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('excel')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+            activeTab === 'excel'
+              ? 'bg-[#7C3AED] text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Upload File Excel (.xlsx)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('form')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+            activeTab === 'form'
+              ? 'bg-[#7C3AED] text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <ListPlus className="w-4 h-4" />
+          Tabel Form ({rows.filter((r) => r.full_name || r.nis).length} Data Siswa)
+        </button>
       </div>
 
       {error && (
-        <div className="p-3 text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-md">
+        <div className="p-4 text-sm bg-rose-50 border border-rose-300 text-rose-700 rounded-xl font-bold">
           {error}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-[#E5E7EB] bg-white">
-        <table className="w-full text-left text-sm border-collapse min-w-[750px]">
-          <thead className="bg-[#F8FAFC] text-[#6B7280] text-xs font-semibold border-b border-[#E5E7EB]">
-            <tr>
-              <th className="px-3 py-2.5 w-10 text-center">No</th>
-              <th className="px-3 py-2.5 w-40">NIS *</th>
-              <th className="px-3 py-2.5 w-40">NISN</th>
-              <th className="px-3 py-2.5 min-w-[200px]">Nama Lengkap *</th>
-              <th className="px-3 py-2.5 w-44 min-w-[170px] whitespace-nowrap">Jenis Kelamin</th>
-              <th className="px-3 py-2.5 w-12 text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E5E7EB]">
-            {rows.map((row, index) => {
-              const nisErr = cellErrors[index]?.nis;
-              const nameErr = cellErrors[index]?.full_name;
+      {/* Tab 1: Dynamic Excel Import */}
+      {activeTab === 'excel' && (
+        <ExcelStudentImport onImport={handleExcelExtracted} />
+      )}
 
-              return (
-                <tr key={index} className="table-row-hover transition-colors">
-                  <td className="px-3 py-2 text-center text-xs font-semibold text-[#6B7280]">
-                    {index + 1}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      placeholder="NIS"
-                      value={row.nis}
-                      onChange={(e) => handleRowChange(index, 'nis', e.target.value)}
-                      error={nisErr || undefined}
-                      className="py-1 text-xs"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      placeholder="NISN (Opsional)"
-                      value={row.nisn}
-                      onChange={(e) => handleRowChange(index, 'nisn', e.target.value)}
-                      className="py-1 text-xs"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      placeholder="Nama lengkap"
-                      value={row.full_name}
-                      onChange={(e) => handleRowChange(index, 'full_name', e.target.value)}
-                      error={nameErr || undefined}
-                      className="py-1 text-xs"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Select
-                      value={row.gender}
-                      onChange={(e) => handleRowChange(index, 'gender', e.target.value as 'L' | 'P')}
-                      options={[
-                        { value: 'L', label: 'Laki-Laki (L)' },
-                        { value: 'P', label: 'Perempuan (P)' },
-                      ]}
-                      className="py-1 text-xs"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(index)}
-                      className="text-[#6B7280] hover:text-rose-600 transition-colors p-1 cursor-pointer"
-                      title="Hapus Baris"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+      {/* Tab 2: Manual / Populated Form Table */}
+      {activeTab === 'form' && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-700">
+              Periksa dan edit data siswa sebelum disimpan ke database:
+            </span>
+            <Button type="button" variant="secondary" onClick={addRow} size="sm">
+              <Plus className="w-4 h-4" /> Tambah Baris
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white max-h-96">
+            <table className="w-full text-left text-sm border-collapse min-w-[750px]">
+              <thead className="bg-slate-100 text-slate-800 text-sm font-bold border-b border-slate-300 sticky top-0 z-10">
+                <tr>
+                  <th className="px-3 py-2.5 w-12 text-center">No</th>
+                  <th className="px-3 py-2.5 w-44">NIS *</th>
+                  <th className="px-3 py-2.5 w-44">NISN</th>
+                  <th className="px-3 py-2.5 min-w-[200px]">Nama Lengkap *</th>
+                  <th className="px-3 py-2.5 w-48 min-w-[170px]">Jenis Kelamin</th>
+                  <th className="px-3 py-2.5 w-14 text-center">Aksi</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {rows.map((row, index) => {
+                  const nisErr = cellErrors[index]?.nis;
+                  const nameErr = cellErrors[index]?.full_name;
 
-      <div className="flex justify-end gap-3 pt-2">
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Batal
-          </Button>
-        ) : (
-          <Button type="button" variant="outline" onClick={() => router.push('/siswa')}>
-            Batal
-          </Button>
-        )}
-        <Button type="submit" disabled={loading}>
-          <Save className="w-4 h-4" /> {loading ? 'Menyimpan...' : 'Simpan Semua Data Siswa'}
-        </Button>
-      </div>
-    </form>
+                  return (
+                    <tr key={index} className="table-row-hover transition-colors">
+                      <td className="px-3 py-2 text-center text-sm font-bold text-slate-700">
+                        {index + 1}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          placeholder="NIS"
+                          value={row.nis}
+                          onChange={(e) => handleRowChange(index, 'nis', e.target.value)}
+                          error={nisErr || undefined}
+                          className="py-1 text-sm font-mono"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          placeholder="NISN (Opsional)"
+                          value={row.nisn}
+                          onChange={(e) => handleRowChange(index, 'nisn', e.target.value)}
+                          className="py-1 text-sm font-mono"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          placeholder="Nama lengkap siswa"
+                          value={row.full_name}
+                          onChange={(e) => handleRowChange(index, 'full_name', e.target.value)}
+                          error={nameErr || undefined}
+                          className="py-1 text-sm font-bold"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Select
+                          value={row.gender}
+                          onChange={(e) => handleRowChange(index, 'gender', e.target.value as 'L' | 'P')}
+                          options={[
+                            { value: 'L', label: 'Laki-Laki (L)' },
+                            { value: 'P', label: 'Perempuan (P)' },
+                          ]}
+                          className="py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeRow(index)}
+                          className="text-slate-600 hover:text-rose-700 transition-colors p-2 rounded-lg hover:bg-rose-50 cursor-pointer"
+                          title="Hapus Baris"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
+            {onCancel ? (
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Batal
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => router.push('/siswa')}>
+                Batal
+              </Button>
+            )}
+            <Button type="submit" disabled={loading} size="lg">
+              <Save className="w-5 h-5" /> {loading ? 'Menyimpan...' : `Simpan ${rows.filter((r) => r.full_name || r.nis).length} Data Siswa`}
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
