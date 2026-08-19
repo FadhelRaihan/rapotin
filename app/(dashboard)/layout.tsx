@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth/session';
 import { Sidebar } from '@/components/layout/sidebar';
 import { GraduationCap, Bell, ArrowLeft, Calendar } from 'lucide-react';
 import { db, withDbRetry } from '@/lib/db';
+import { InstallDesktopButton } from '@/components/pwa/pwa-installer';
 
 export default async function DashboardLayout({
   children,
@@ -55,8 +56,11 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        {/* Header Right Actions (Classroom Badge, Ganti Kelas Button, Bell, Teacher Profile) */}
+        {/* Header Right Actions (Classroom Badge, Install App, Ganti Kelas Button, Bell, Teacher Profile) */}
         <div className="flex items-center gap-3">
+          {/* Desktop PWA Install Button */}
+          <InstallDesktopButton />
+
           {/* Active Classroom Badge */}
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#F3E8FF] rounded-full text-xs font-semibold text-[#7C3AED] border border-purple-200">
             <Calendar className="w-3.5 h-3.5" />
@@ -73,6 +77,7 @@ export default async function DashboardLayout({
               <span>Ganti Kelas</span>
             </button>
           </Link>
+
 
           <button className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F8FAFC] rounded-full transition-colors cursor-pointer">
             <Bell className="w-5 h-5" />
