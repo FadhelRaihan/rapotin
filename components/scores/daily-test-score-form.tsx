@@ -46,6 +46,7 @@ export interface DailyTestScore {
   score: number | null;
   is_pending: boolean;
   multiple_choice_count?: number | null;
+  short_answer_count?: number | null;
   essay_count?: number | null;
   recorded_at: string;
   student: Student;
@@ -56,14 +57,18 @@ interface DailyTestScoreFormProps {
   students: Student[];
   subjects: Subject[];
   initialScores: DailyTestScore[];
+  midterm?: boolean;
 }
 
 export function DailyTestScoreForm({
   students,
   subjects,
   initialScores,
+  midterm = false,
 }: DailyTestScoreFormProps) {
   const router = useRouter();
+  const assessment = midterm ? 'STS' : 'UH';
+  const assessmentName = midterm ? 'Sumatif Tengah Semester' : 'Ulangan Harian';
   const [activeTab, setActiveTab] = useState<'batch' | 'history' | 'pending'>('batch');
   const [scores, setScores] = useState<DailyTestScore[]>(initialScores);
 
@@ -71,8 +76,9 @@ export function DailyTestScoreForm({
   const [batchHeader, setBatchHeader] = useState({
     subject_id: subjects[0]?.id || '',
     semester: 'I',
-    label: '',
+    label: midterm ? 'STS' : '',
     multiple_choice_count: '',
+    short_answer_count: '',
     essay_count: '',
     recorded_at: new Date().toISOString().split('T')[0],
   });
@@ -108,6 +114,10 @@ export function DailyTestScoreForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const batchStudents = midterm ? students.filter(student => !scores.some(score => score.student_id === student.id && score.subject_id === batchHeader.subject_id && score.semester === batchHeader.semester)) : students;
+  const normalizeMidterm = (item: any): DailyTestScore => ({ ...item, label: 'STS', score: item.score === null ? null : Number(item.score), student: students.find(student => student.id === item.student_id)!, subject: subjects.find(subject => subject.id === item.subject_id)! });
+  const scoreUrl = (id: string) => midterm ? `/api/midterm-scores/${id}` : `/api/scores/daily-test/${id}`;
+  const updateBody = (item: DailyTestScore, score: number | null) => ({ score, recorded_at: item.recorded_at.slice(0, 10), multiple_choice_count: item.multiple_choice_count ?? 0, short_answer_count: item.short_answer_count ?? 0, essay_count: item.essay_count ?? 0 });
 
   const openEditHistoryModal = (scoreItem: DailyTestScore) => {
     setEditingHistoryScore(scoreItem);
@@ -134,10 +144,10 @@ export function DailyTestScoreForm({
         return;
       }
 
-      const res = await fetch(`/api/scores/daily-test/${editingHistoryScore.id}`, {
-        method: 'PUT',
+      const res = await fetch(scoreUrl(editingHistoryScore.id), {
+        method: midterm ? 'PATCH' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(midterm ? updateBody(editingHistoryScore, numScore) : {
           score: numScore,
           label: editFormData.label,
           semester: editFormData.semester,
@@ -146,15 +156,15 @@ export function DailyTestScoreForm({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Gagal memperbarui nilai UH');
+        throw new Error(data.error || `Gagal memperbarui nilai ${assessment}`);
       }
 
       setScores((prev) =>
-        prev.map((s) => (s.id === editingHistoryScore.id ? data.score : s))
+        prev.map((s) => (s.id === editingHistoryScore.id ? midterm ? { ...s, score: numScore, is_pending: numScore === null } : data.score : s))
       );
       setEditingHistoryScore(null);
-      setSuccessMsg('Nilai UH berhasil diperbarui.');
-      toast.success('Nilai UH berhasil diperbarui.');
+      setSuccessMsg(`Nilai ${assessment} berhasil diperbarui.`);
+      toast.success(`Nilai ${assessment} berhasil diperbarui.`);
       setTimeout(() => setSuccessMsg(''), 4000);
       router.refresh();
     } catch (err: any) {
@@ -195,7 +205,7 @@ export function DailyTestScoreForm({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
-      if (index < students.length - 1) {
+      if (index < batchStudents.length - 1) {
         inputRefs.current[index + 1]?.focus();
       }
     } else if (e.key === 'ArrowUp') {
@@ -206,7 +216,7 @@ export function DailyTestScoreForm({
     }
   };
 
-  const filledCount = Object.values(scoreMap).filter((v) => v.trim() !== '').length;
+  const filledCount = batchStudents.filter(student => scoreMap[student.id]?.trim()).length;
   const hasScoreErrors = Object.values(scoreErrors).some((err) => err !== null);
 
   // Filtered lists
@@ -241,7 +251,7 @@ export function DailyTestScoreForm({
     const lErr = validateTaskLabel(batchHeader.label);
     if (lErr) {
       setLabelError(lErr);
-      setError(`Kesalahan pada Nama / Label UH: ${lErr}`);
+      setError(`Kesalahan pada Nama / Label ${assessment}: ${lErr}`);
       return;
     }
 
@@ -251,7 +261,7 @@ export function DailyTestScoreForm({
     }
 
     const scoresPayload: { student_id: string; score: number | null; is_pending: boolean }[] = [];
-    for (const student of students) {
+    for (const student of batchStudents) {
       const val = scoreMap[student.id];
       if (val !== undefined && val.trim() !== '') {
         const num = parseFloat(val);
@@ -268,25 +278,27 @@ export function DailyTestScoreForm({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/scores/daily-test/batch', {
+      const res = await fetch(midterm ? '/api/midterm-scores' : '/api/scores/daily-test/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...batchHeader,
-          multiple_choice_count: batchHeader.multiple_choice_count ? parseInt(batchHeader.multiple_choice_count) : null,
-          essay_count: batchHeader.essay_count ? parseInt(batchHeader.essay_count) : null,
+          multiple_choice_count: batchHeader.multiple_choice_count ? Number(batchHeader.multiple_choice_count) : midterm ? 0 : null,
+          ...(midterm ? { short_answer_count: Number(batchHeader.short_answer_count || 0) } : {}),
+          essay_count: batchHeader.essay_count ? Number(batchHeader.essay_count) : midterm ? 0 : null,
           scores: scoresPayload,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan nilai UH');
+      if (!res.ok) throw new Error(data.error || `Gagal menyimpan nilai ${assessment}`);
+      if (midterm) { data.savedScores = data.data.map(normalizeMidterm); data.filledCount = data.savedScores.filter((item: DailyTestScore) => !item.is_pending).length; }
 
       if (data.savedScores && data.savedScores.length > 0) {
         setScores((prev) => [...data.savedScores, ...prev]);
       }
 
-      const successText = `Berhasil menyimpan ${data.filledCount} nilai ulangan harian siswa!`;
+      const successText = `Berhasil menyimpan ${data.filledCount} nilai ${assessmentName.toLowerCase()} siswa!`;
       setSuccessMsg(successText);
       toast.success(successText);
       setScoreMap({});
@@ -300,11 +312,11 @@ export function DailyTestScoreForm({
         label: batchHeader.label,
       });
 
-      setBatchHeader((prev) => ({ ...prev, label: '', multiple_choice_count: '', essay_count: '' }));
+      setBatchHeader((prev) => ({ ...prev, label: midterm ? 'STS' : '', multiple_choice_count: '', short_answer_count: '', essay_count: '' }));
       setActiveTab('history');
       router.refresh();
     } catch (err: any) {
-      const errMsg = err.message || 'Terjadi kesalahan saat menyimpan nilai UH.';
+      const errMsg = err.message || `Terjadi kesalahan saat menyimpan nilai ${assessment}.`;
       setError(errMsg);
       toast.error(errMsg);
     } finally {
@@ -317,21 +329,21 @@ export function DailyTestScoreForm({
     const val = pendingInputMap[scoreId];
     const scoreErr = validateScoreValue(val || '');
     if (scoreErr) {
-      toast.error(`Nilai susulan UH tidak valid: ${scoreErr}`);
+      toast.error(`Nilai susulan ${assessment} tidak valid: ${scoreErr}`);
       return;
     }
 
     const num = parseFloat(val);
 
     try {
-      const res = await fetch(`/api/scores/daily-test/${scoreId}`, {
-        method: 'PUT',
+      const res = await fetch(scoreUrl(scoreId), {
+        method: midterm ? 'PATCH' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score: num }),
+        body: JSON.stringify(midterm ? updateBody(scores.find(item => item.id === scoreId)!, num) : { score: num }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan nilai susulan UH');
+      if (!res.ok) throw new Error(data.error || `Gagal menyimpan nilai susulan ${assessment}`);
 
       // Update local state
       setScores((prev) =>
@@ -344,30 +356,30 @@ export function DailyTestScoreForm({
         return copy;
       });
 
-      toast.success('Nilai susulan UH berhasil disimpan!');
+      toast.success(`Nilai susulan ${assessment} berhasil disimpan!`);
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message || 'Gagal memperbarui nilai susulan UH.');
+      toast.error(err.message || `Gagal memperbarui nilai susulan ${assessment}.`);
     }
   };
 
   // Delete Record
   const handleDelete = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus nilai UH ini?')) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus nilai ${assessment} ini?`)) return;
 
     try {
-      const res = await fetch(`/api/scores/daily-test/${id}`, { method: 'DELETE' });
+      const res = await fetch(scoreUrl(id), { method: 'DELETE' });
       if (res.ok) {
         setScores((prev) => prev.filter((s) => s.id !== id));
-        toast.success('Nilai UH berhasil dihapus.');
+        toast.success(`Nilai ${assessment} berhasil dihapus.`);
         router.refresh();
       } else {
         const data = await res.json();
-        toast.error(data.error || 'Gagal menghapus nilai UH.');
+        toast.error(data.error || `Gagal menghapus nilai ${assessment}.`);
       }
     } catch (err) {
       console.error('Error deleting score:', err);
-      toast.error('Gagal menghapus nilai UH.');
+      toast.error(`Gagal menghapus nilai ${assessment}.`);
     }
   };
 
@@ -381,18 +393,18 @@ export function DailyTestScoreForm({
               Dashboard
             </Link>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-[#111827] font-medium">Ulangan Harian</span>
+            <span className="text-[#111827] font-medium">{assessmentName}</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-[#111827] tracking-tight">
-            Input Nilai Ulangan Harian (UH)
+            Input Nilai {assessmentName} ({assessment})
           </h1>
           <p className="text-sm text-[#6B7280] mt-1">
-            Mode cepat input nilai ulangan harian 1 kelas sekaligus atau lihat riwayat nilai
+            Mode cepat input nilai {assessmentName.toLowerCase()} 1 kelas sekaligus atau lihat riwayat nilai
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center p-1 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl w-fit">
+        <div className="flex flex-wrap items-center p-1 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl w-fit max-w-full">
           <button
             type="button"
             onClick={() => setActiveTab('batch')}
@@ -404,7 +416,7 @@ export function DailyTestScoreForm({
             )}
           >
             <Sparkles className="w-4 h-4" />
-            <span>+ Input Nilai UH Baru (Batch)</span>
+            <span>+ Input Nilai {assessment} Baru (Batch)</span>
           </button>
           <button
             type="button"
@@ -417,7 +429,7 @@ export function DailyTestScoreForm({
             )}
           >
             <ListFilter className="w-4 h-4" />
-            <span>📋 Riwayat Nilai UH ({validHistoryScores.length})</span>
+            <span>📋 Riwayat Nilai {assessment} ({validHistoryScores.length})</span>
           </button>
           {pendingScores.length > 0 && (
             <button
@@ -431,7 +443,7 @@ export function DailyTestScoreForm({
               )}
             >
               <Clock className="w-4 h-4" />
-              <span>⌛ Nilai UH Susulan ({pendingScores.length})</span>
+              <span>⌛ Nilai {assessment} Susulan ({pendingScores.length})</span>
             </button>
           )}
         </div>
@@ -448,10 +460,10 @@ export function DailyTestScoreForm({
               </div>
               <div>
                 <h2 className="text-base font-bold text-[#111827]">
-                  1. Informasi Ulangan Harian (UH) Yang Akan Dinilai
+                  1. Informasi {assessmentName} ({assessment}) Yang Akan Dinilai
                 </h2>
                 <p className="text-xs text-[#6B7280]">
-                  Pilih mata pelajaran dan tentukan label UH 1x untuk seluruh kelas
+                  {midterm ? 'Pilih mata pelajaran dan semester. Satu STS per siswa, mapel, dan semester; nilai tercatat tersedia di Riwayat atau Susulan.' : 'Pilih mata pelajaran dan tentukan label UH 1x untuk seluruh kelas'}
                 </p>
               </div>
             </div>
@@ -460,7 +472,7 @@ export function DailyTestScoreForm({
               <Select
                 label="Mata Pelajaran *"
                 value={batchHeader.subject_id}
-                onChange={(e) => setBatchHeader({ ...batchHeader, subject_id: e.target.value })}
+                onChange={(e) => { setBatchHeader({ ...batchHeader, subject_id: e.target.value }); if (midterm) { setScoreMap({}); setScoreErrors({}); } }}
                 options={subjects.map((sub) => ({
                   value: sub.id,
                   label: sub.name,
@@ -471,7 +483,7 @@ export function DailyTestScoreForm({
               <Select
                 label="Semester *"
                 value={batchHeader.semester}
-                onChange={(e) => setBatchHeader({ ...batchHeader, semester: e.target.value })}
+                onChange={(e) => { setBatchHeader({ ...batchHeader, semester: e.target.value }); if (midterm) { setScoreMap({}); setScoreErrors({}); } }}
                 options={[
                   { value: 'I', label: 'Semester I' },
                   { value: 'II', label: 'Semester II' },
@@ -486,7 +498,7 @@ export function DailyTestScoreForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <Input
+              {!midterm && <Input
                 label="Nama / Label UH *"
                 placeholder="Misal: Ulangan Harian 1 Bab Pecahan"
                 value={batchHeader.label}
@@ -494,7 +506,7 @@ export function DailyTestScoreForm({
                 onBlur={(e) => setLabelError(validateTaskLabel(e.target.value))}
                 error={labelError || undefined}
                 required
-              />
+              />}
               <Input
                 label="Jumlah Soal PG (Opsional)"
                 type="number"
@@ -502,6 +514,16 @@ export function DailyTestScoreForm({
                 value={batchHeader.multiple_choice_count}
                 onChange={(e) => setBatchHeader({ ...batchHeader, multiple_choice_count: e.target.value })}
               />
+              {midterm && <Input
+                label="Jumlah Soal Isian Singkat (Opsional)"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                placeholder="Misal: 10"
+                value={batchHeader.short_answer_count}
+                onChange={(e) => setBatchHeader({ ...batchHeader, short_answer_count: e.target.value })}
+              />}
               <Input
                 label="Jumlah Soal Essay (Opsional)"
                 type="number"
@@ -532,7 +554,7 @@ export function DailyTestScoreForm({
             <div className="p-4 bg-[#F8FAFC] border-b border-[#E5E7EB] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-[#111827]">
-                  2. Lembar Input Nilai UH Kelas ({students.length} Siswa)
+                  2. Lembar Input Nilai {assessment} Kelas ({batchStudents.length} Siswa)
                 </h3>
                 <p className="text-xs text-[#6B7280]">
                   Gunakan tombol <kbd className="px-1.5 py-0.5 bg-white border rounded text-[10px] font-mono">Enter</kbd> atau <kbd className="px-1.5 py-0.5 bg-white border rounded text-[10px] font-mono">Panah Bawah</kbd> untuk pindah baris secara cepat
@@ -540,7 +562,7 @@ export function DailyTestScoreForm({
               </div>
 
               <div className="px-3 py-1.5 rounded-full bg-[#F3E8FF] text-[#7C3AED] text-xs font-bold border border-purple-200">
-                {filledCount} / {students.length} Siswa Terisi
+                {filledCount} / {batchStudents.length} Siswa Terisi
               </div>
             </div>
 
@@ -556,14 +578,14 @@ export function DailyTestScoreForm({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5E7EB]">
-                  {students.length === 0 ? (
+                  {batchStudents.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-[#6B7280] text-xs">
-                        Belum ada siswa di kelas ini. Silakan tambah siswa di menu Data Siswa.
+                        {midterm && students.length ? 'STS sudah tercatat. Gunakan Riwayat Nilai atau Nilai Susulan untuk memperbarui.' : 'Belum ada siswa di kelas ini. Silakan tambah siswa di menu Data Siswa.'}
                       </td>
                     </tr>
                   ) : (
-                    students.map((student, idx) => {
+                    batchStudents.map((student, idx) => {
                       const scoreVal = scoreMap[student.id] || '';
                       const isFilled = scoreVal.trim() !== '';
                       const fieldErr = scoreErrors[student.id];
@@ -590,6 +612,7 @@ export function DailyTestScoreForm({
                                 min="0"
                                 max="100"
                                 placeholder="0 - 100"
+                                aria-label={`Nilai ${assessment} ${student.full_name}`}
                                 value={scoreVal}
                                 onChange={(e) => handleScoreChange(student.id, e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, idx)}
@@ -634,7 +657,7 @@ export function DailyTestScoreForm({
             <div className="p-4 bg-[#F8FAFC] border-t border-[#E5E7EB] flex justify-end">
               <Button type="submit" disabled={loading || filledCount === 0 || hasScoreErrors || Boolean(labelError)} size="md">
                 <Save className="w-4 h-4" />
-                <span>{loading ? 'Menyimpan Semua...' : `Simpan ${filledCount} Nilai UH (1 Klik)`}</span>
+                <span>{loading ? 'Menyimpan Semua...' : `Simpan ${filledCount} Nilai ${assessment} (1 Klik)`}</span>
               </Button>
             </div>
           </Card>
@@ -648,7 +671,7 @@ export function DailyTestScoreForm({
           <Card className="p-4 border-[#E5E7EB] bg-white rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs font-bold text-[#111827]">
               <Filter className="w-4 h-4 text-[#7C3AED]" />
-              <span>Filter Riwayat Nilai UH:</span>
+              <span>Filter Riwayat Nilai {assessment}:</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 max-w-3xl">
@@ -676,7 +699,7 @@ export function DailyTestScoreForm({
                 ]}
               />
 
-              <Select
+              {!midterm && <Select
                 value={historyFilter.label}
                 onChange={(e) => setHistoryFilter({ ...historyFilter, label: e.target.value })}
                 options={[
@@ -686,7 +709,7 @@ export function DailyTestScoreForm({
                     label: lbl,
                   })),
                 ]}
-              />
+              />}
             </div>
           </Card>
 
@@ -694,7 +717,7 @@ export function DailyTestScoreForm({
           <Card className="p-0 overflow-hidden border border-[#E5E7EB] rounded-2xl bg-white shadow-xs">
             <div className="p-4 bg-[#F8FAFC] border-b border-[#E5E7EB] flex items-center justify-between">
               <div className="text-xs font-bold text-[#111827]">
-                Menampilkan {filteredHistoryScores.length} Data Nilai UH Terisi
+                Menampilkan {filteredHistoryScores.length} Data Nilai {assessment} Terisi
               </div>
               {filteredHistoryScores.length > 0 && (
                 <div className="text-xs text-[#6B7280]">
@@ -715,7 +738,7 @@ export function DailyTestScoreForm({
                     <th className="p-4 w-12 text-center">No</th>
                     <th className="p-4">Nama Siswa</th>
                     <th className="p-4">Mata Pelajaran</th>
-                    <th className="p-4">Label UH</th>
+                    <th className="p-4">{midterm ? 'Penilaian' : 'Label UH'}</th>
                     <th className="p-4 text-center">Detail Soal</th>
                     <th className="p-4 text-center">Semester</th>
                     <th className="p-4 text-center">Nilai (0-100)</th>
@@ -726,7 +749,7 @@ export function DailyTestScoreForm({
                   {filteredHistoryScores.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-[#6B7280] text-xs">
-                        Tidak ada riwayat nilai UH yang sesuai dengan filter yang dipilih.
+                        Tidak ada riwayat nilai {assessment} yang sesuai dengan filter yang dipilih.
                       </td>
                     </tr>
                   ) : (
@@ -747,11 +770,9 @@ export function DailyTestScoreForm({
                           {score.label}
                         </td>
                         <td className="p-4 text-center text-xs text-[#6B7280]">
-                          {score.multiple_choice_count || score.essay_count ? (
+                          {score.multiple_choice_count || (midterm && score.short_answer_count) || score.essay_count ? (
                             <span className="font-mono text-[11px]">
-                              {score.multiple_choice_count ? `${score.multiple_choice_count} PG` : ''}
-                              {score.multiple_choice_count && score.essay_count ? ' • ' : ''}
-                              {score.essay_count ? `${score.essay_count} Essay` : ''}
+                              {[score.multiple_choice_count ? `${score.multiple_choice_count} PG` : '', midterm && score.short_answer_count ? `${score.short_answer_count} Isian Singkat` : '', score.essay_count ? `${score.essay_count} Essay` : ''].filter(Boolean).join(' • ')}
                             </span>
                           ) : (
                             '-'
@@ -798,7 +819,7 @@ export function DailyTestScoreForm({
             <div>
               <h3 className="text-sm font-bold text-[#111827] flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-600" />
-                Daftar Nilai UH Belum Terisi ({pendingScores.length} Siswa)
+                Daftar Nilai {assessment} Belum Terisi ({pendingScores.length} Siswa)
               </h3>
               <p className="text-xs text-[#6B7280]">
                 Siswa yang nilainya dikosongkan saat batch input. Masukkan nilai susulan jika siswa sudah mengikuti ujian susulan.
@@ -813,7 +834,7 @@ export function DailyTestScoreForm({
                   <th className="p-4 w-12 text-center">No</th>
                   <th className="p-4">Nama Siswa</th>
                   <th className="p-4">Mata Pelajaran</th>
-                  <th className="p-4">Label UH</th>
+                  <th className="p-4">{midterm ? 'Penilaian' : 'Label UH'}</th>
                   <th className="p-4 text-center">Semester</th>
                   <th className="p-4 w-52">Input Nilai Susulan</th>
                   <th className="p-4 text-right">Aksi</th>
@@ -823,7 +844,7 @@ export function DailyTestScoreForm({
                 {pendingScores.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-[#6B7280] text-xs">
-                      🎉 Selamat! Seluruh nilai UH siswa telah terisi lengkap.
+                      🎉 Selamat! Seluruh nilai {assessment} siswa telah terisi lengkap.
                     </td>
                   </tr>
                 ) : (
@@ -854,6 +875,7 @@ export function DailyTestScoreForm({
                             min="0"
                             max="100"
                             placeholder="0 - 100"
+                            aria-label={`Nilai susulan ${assessment} ${score.student?.full_name}`}
                             value={pendingInputMap[score.id] || ''}
                             onChange={(e) =>
                               setPendingInputMap({ ...pendingInputMap, [score.id]: e.target.value })
@@ -894,11 +916,12 @@ export function DailyTestScoreForm({
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Edit2 className="w-5 h-5 text-[#7C3AED]" />
-                Edit Data Nilai Ulangan Harian (UH)
+                Edit Data Nilai {assessmentName} ({assessment})
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingHistoryScore(null)}
+                aria-label="Tutup edit nilai"
                 className="text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -923,15 +946,16 @@ export function DailyTestScoreForm({
                 </strong>
               </div>
 
-              <Input
+              {!midterm && <Input
                 label="Judul / Label UH *"
                 value={editFormData.label}
                 onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
                 required
-              />
+              />}
 
               <Select
                 label="Semester *"
+                disabled={midterm}
                 value={editFormData.semester}
                 onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
                 options={[
@@ -941,7 +965,7 @@ export function DailyTestScoreForm({
               />
 
               <Input
-                label="Nilai UH (0 - 100)"
+                label={`Nilai ${assessment} (0 - 100)`}
                 placeholder="Kosongkan jika belum ada nilai"
                 value={editFormData.score}
                 onChange={(e) => setEditFormData({ ...editFormData, score: e.target.value })}

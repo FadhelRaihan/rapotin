@@ -192,7 +192,7 @@ export function StudentTable({ initialStudents }: StudentTableProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button variant="secondary" size="md" onClick={() => setIsBulkModalOpen(true)}>
             <UserPlus className="w-4 h-4" /> Input Massal (Bulk)
           </Button>

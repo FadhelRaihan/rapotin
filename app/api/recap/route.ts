@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, withDbRetry } from '@/lib/db';
 import { getSession } from '@/lib/auth/session';
+import { overallScore } from '@/lib/scores';
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -47,10 +48,11 @@ export async function GET(request: Request) {
       })
     );
 
+    const midterms = await db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } });
     const recapData = students.map((student) => {
       const studentSubjectScores: Record<
         string,
-        { assignmentAvg: number; dailyTestAvg: number; finalScore: number }
+        { assignmentAvg: number; dailyTestAvg: number; midtermScore: number | null; midtermPending: boolean; finalScore: number }
       > = {};
 
       let totalFinalScores = 0;
@@ -76,23 +78,17 @@ export async function GET(request: Request) {
               studentDailyTests.length
             : 0;
 
-        let finalScore = 0;
-        if (assignmentAvg > 0 && dailyTestAvg > 0) {
-          finalScore = (assignmentAvg + dailyTestAvg) / 2;
-        } else if (assignmentAvg > 0) {
-          finalScore = assignmentAvg;
-        } else if (dailyTestAvg > 0) {
-          finalScore = dailyTestAvg;
-        }
-
-        if (finalScore > 0) {
-          totalFinalScores += finalScore;
-          subjectCountWithScores++;
-        }
+        const midterm = midterms.find(item => item.student_id === student.id && item.subject_id === subject.id);
+        const midtermScore = midterm && !midterm.is_pending && midterm.score !== null ? Number(midterm.score) : null;
+        const finalScore = overallScore(assignmentAvg, dailyTestAvg, midtermScore ?? 0);
+        totalFinalScores += finalScore;
+        subjectCountWithScores++;
 
         studentSubjectScores[subject.id] = {
           assignmentAvg: Math.round(assignmentAvg * 10) / 10,
           dailyTestAvg: Math.round(dailyTestAvg * 10) / 10,
+          midtermScore,
+          midtermPending: midterm?.is_pending ?? false,
           finalScore: Math.round(finalScore * 10) / 10,
         };
       });
@@ -112,6 +108,7 @@ export async function GET(request: Request) {
       subjects,
       assignments: assignmentScores,
       dailyTests: dailyTestScores,
+      midterms,
       recap: recapData,
     });
   } catch (error) {

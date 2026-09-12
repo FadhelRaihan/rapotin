@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db, withDbRetry } from '@/lib/db';
 import { getSession } from '@/lib/auth/session';
 import ExcelJS from 'exceljs';
+import { exportRanks } from '@/lib/export-ranking';
+import { overallScore } from '@/lib/scores';
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -68,6 +70,12 @@ export async function GET(request: Request) {
       })
     );
 
+    const midterms = await db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } });
+    const stsValue = (studentId: string, subjectId: string) => {
+      const item = midterms.find(score => score.student_id === studentId && score.subject_id === subjectId);
+      return item && !item.is_pending ? Number(item.score) : 0;
+    };
+    students.sort((a, b) => a.full_name.localeCompare(b.full_name, 'id', { sensitivity: 'base' }) || a.id.localeCompare(b.id));
     // Initialize Excel Workbook
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Rapotin App';
@@ -163,7 +171,29 @@ export async function GET(request: Request) {
     // ==========================================
     // MODE 1: EXPORT ALL SUBJECTS IN 1 SEMESTER
     // ==========================================
-    if (mode === '1') {
+    if (mode === '5') {
+      const ws = workbook.addWorksheet('Rekap STS');
+      applyStandardHeaderAndFreeze(ws, 'NILAI STS', `Semester ${semester}`);
+      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', ...subjects.map(subject => subject.name), 'Rata-Rata STS', 'Ranking'];
+      styleTableHeader(ws.getRow(6));
+      const rows = students.map(student => {
+        const values = subjects.map(subject => {
+          const item = midterms.find(score => score.student_id === student.id && score.subject_id === subject.id);
+          return item && !item.is_pending && item.score !== null ? Number(item.score) : null;
+        });
+        const filled = values.filter((value): value is number => value !== null);
+        const mean = filled.length ? filled.reduce((sum, value) => sum + value, 0) / filled.length : null;
+        return { student, values, mean };
+      });
+      const ranks = exportRanks(rows.map(row => row.mean));
+      rows.forEach((item, index) => {
+        const row = ws.addRow([index + 1, item.student.nisn || item.student.nis, item.student.full_name, item.student.gender || '-', ...item.values.map(value => value ?? '-'), item.mean ?? '-', ranks[index] ?? '-']);
+        styleDataRow(row, index);
+        row.getCell(subjects.length + 6).numFmt = '0';
+      });
+      ws.columns = [{ width: 8 }, { width: 18 }, { width: 30 }, { width: 10 }, ...subjects.map(() => ({ width: 18 })), { width: 18 }, { width: 12 }];
+    }
+    else if (mode === '1') {
       subjects.forEach((subject) => {
         const sheetName = subject.name.replace(/[*?:/\\\[\]]/g, '').substring(0, 30);
         const ws = workbook.addWorksheet(sheetName);
@@ -191,6 +221,7 @@ export async function GET(request: Request) {
           'Rerata Tugas',
           ...uniqueUhLabels.map((_, i) => `UH${i + 1}`),
           'Rerata UH',
+          'STS', 'Overall',
         ];
 
         ws.getRow(6).values = headerValues;
@@ -208,8 +239,8 @@ export async function GET(request: Request) {
             return found ? Number(found.score) : null;
           });
 
-          const validAsgs = asgScores.filter((v) => v !== null) as number[];
-          const validUhs = uhScores.filter((v) => v !== null) as number[];
+          const validAsgs = subjectAsgs.filter(item => item.student_id === student.id).map(item => Number(item.score));
+          const validUhs = subjectUhs.filter(item => item.student_id === student.id).map(item => Number(item.score));
 
           const asgAvg =
             validAsgs.length > 0
@@ -221,7 +252,7 @@ export async function GET(request: Request) {
               ? validUhs.reduce((a, b) => a + b, 0) / validUhs.length
               : 0;
 
-          const overallAvg = (asgAvg + uhAvg) / 2;
+          const overallAvg = overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id));
 
           return {
             student,
@@ -233,20 +264,20 @@ export async function GET(request: Request) {
           };
         });
 
-        // Auto-sort by overallAvg desc (highest score first)
-        studentRows.sort((a, b) => b.overallAvg - a.overallAvg);
+        const ranks = exportRanks(studentRows.map(item => item.overallAvg));
 
         // Add rows to Worksheet
         studentRows.forEach((item, index) => {
           const rowValues = [
-            index + 1,
+            ranks[index],
             item.student.nisn || item.student.nis,
             item.student.full_name,
             item.student.gender || '-',
             ...item.asgScores.map((v) => (v !== null ? v : '-')),
-            item.asgAvg > 0 ? item.asgAvg : '-',
+            item.asgAvg,
             ...item.uhScores.map((v) => (v !== null ? v : '-')),
-            item.uhAvg > 0 ? item.uhAvg : '-',
+            item.uhAvg,
+            stsValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
           ];
 
           const row = ws.addRow(rowValues);
@@ -262,6 +293,7 @@ export async function GET(request: Request) {
           ...uniqueAsgLabels.map(() => ({ width: 10 })),
           { width: 14 },
           ...uniqueUhLabels.map(() => ({ width: 10 })),
+          { width: 14 }, { width: 14 },
           { width: 14 },
         ];
       });
@@ -296,6 +328,7 @@ export async function GET(request: Request) {
         'Rerata Tugas',
         ...uniqueUhLabels.map((_, i) => `UH${i + 1}`),
         'Rerata UH',
+        'STS', 'Overall',
       ];
 
       ws.getRow(6).values = headerValues;
@@ -312,8 +345,8 @@ export async function GET(request: Request) {
           return found ? Number(found.score) : null;
         });
 
-        const validAsgs = asgScores.filter((v) => v !== null) as number[];
-        const validUhs = uhScores.filter((v) => v !== null) as number[];
+        const validAsgs = subjectAsgs.filter(item => item.student_id === student.id).map(item => Number(item.score));
+        const validUhs = subjectUhs.filter(item => item.student_id === student.id).map(item => Number(item.score));
 
         const asgAvg =
           validAsgs.length > 0 ? validAsgs.reduce((a, b) => a + b, 0) / validAsgs.length : 0;
@@ -326,23 +359,23 @@ export async function GET(request: Request) {
           asgAvg: Math.round(asgAvg * 10) / 10,
           uhScores,
           uhAvg: Math.round(uhAvg * 10) / 10,
-          overallAvg: (asgAvg + uhAvg) / 2,
+          overallAvg: overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id)),
         };
       });
 
-      // Auto-sort by highest score
-      studentRows.sort((a, b) => b.overallAvg - a.overallAvg);
+      const ranks = exportRanks(studentRows.map(item => item.overallAvg));
 
       studentRows.forEach((item, index) => {
         const rowValues = [
-          index + 1,
+          ranks[index],
           item.student.nisn || item.student.nis,
           item.student.full_name,
           item.student.gender || '-',
           ...item.asgScores.map((v) => (v !== null ? v : '-')),
-          item.asgAvg > 0 ? item.asgAvg : '-',
+          item.asgAvg,
           ...item.uhScores.map((v) => (v !== null ? v : '-')),
-          item.uhAvg > 0 ? item.uhAvg : '-',
+          item.uhAvg,
+          stsValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
         ];
 
         const row = ws.addRow(rowValues);
@@ -357,6 +390,7 @@ export async function GET(request: Request) {
         ...uniqueAsgLabels.map(() => ({ width: 10 })),
         { width: 14 },
         ...uniqueUhLabels.map(() => ({ width: 10 })),
+        { width: 14 }, { width: 14 },
         { width: 14 },
       ];
     }
@@ -364,6 +398,20 @@ export async function GET(request: Request) {
     // =========================================================================
     // MODE 3: EXPORT BY SUBJECT & SCORE TYPE -> MULTIPLE SHEETS PER TASK/UH
     // =========================================================================
+    else if ((mode === '3' || mode === '4') && scoreType === 'MIDTERM') {
+      const subject = subjects.find(item => item.id === subjectId);
+      if (!subject) return NextResponse.json({ error: 'Pilih mata pelajaran STS' }, { status: 400 });
+      const ws = workbook.addWorksheet('STS');
+      applyStandardHeaderAndFreeze(ws, `REKAP NILAI STS ${subject.name}`, `Semester ${semester}`);
+      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', 'STS', 'Status', 'Tanggal'];
+      styleTableHeader(ws.getRow(6));
+      students.forEach((student, index) => {
+        const item = midterms.find(score => score.student_id === student.id && score.subject_id === subject.id);
+        const row = ws.addRow([index + 1, student.nisn || student.nis, student.full_name, student.gender || '-', item && !item.is_pending ? Number(item.score) : '-', !item ? 'Kosong' : item.is_pending ? 'Susulan' : 'Terisi', item?.recorded_at.toISOString().slice(0, 10) ?? '-']);
+        styleDataRow(row, index);
+      });
+      ws.columns.forEach(column => { column.width = 18; });
+    }
     else if (mode === '3') {
       const subject = subjects.find((s) => s.id === subjectId) || subjects[0];
       const isAssignment = scoreType === 'ASSIGNMENT';
@@ -409,12 +457,11 @@ export async function GET(request: Request) {
           return { student, score, isRecorded: !!found };
         });
 
-        // Auto-sort by highest score
-        studentRows.sort((a, b) => b.score - a.score);
+        const ranks = exportRanks(studentRows.map(item => item.score));
 
         studentRows.forEach((item, index) => {
           const rowValues = [
-            index + 1,
+            ranks[index],
             item.student.nisn || item.student.nis,
             item.student.full_name,
             item.student.gender || '-',
@@ -474,12 +521,11 @@ export async function GET(request: Request) {
         return { student, score, isRecorded: !!found };
       });
 
-      // Auto-sort by highest score
-      studentRows.sort((a, b) => b.score - a.score);
+      const ranks = exportRanks(studentRows.map(item => item.score));
 
       studentRows.forEach((item, index) => {
         const rowValues = [
-          index + 1,
+          ranks[index],
           item.student.nisn || item.student.nis,
           item.student.full_name,
           item.student.gender || '-',

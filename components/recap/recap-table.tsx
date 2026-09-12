@@ -44,6 +44,8 @@ export interface RecapMatrix {
       assignmentAvg: number | null;
       dailyTestAvg: number | null;
       overallAvg: number | null;
+      midtermScore: number | null;
+      midtermPending: boolean;
     };
   };
 }
@@ -83,9 +85,11 @@ export function RecapTable() {
         subjectList.forEach((sub: Subject) => {
           const scores = item.subjectScores?.[sub.id];
           matrixMap[item.student.id][sub.id] = {
-            assignmentAvg: scores?.assignmentAvg && scores.assignmentAvg > 0 ? scores.assignmentAvg : null,
-            dailyTestAvg: scores?.dailyTestAvg && scores.dailyTestAvg > 0 ? scores.dailyTestAvg : null,
-            overallAvg: scores?.finalScore && scores.finalScore > 0 ? scores.finalScore : null,
+            assignmentAvg: scores?.assignmentAvg ?? 0,
+            dailyTestAvg: scores?.dailyTestAvg ?? 0,
+            overallAvg: scores?.finalScore ?? 0,
+            midtermScore: scores?.midtermScore ?? null,
+            midtermPending: scores?.midtermPending ?? false,
           };
         });
       });
@@ -152,7 +156,7 @@ export function RecapTable() {
     if (isDetailMode) {
       return detailLabels.length + 1; // individual items + average column (RT / RUH)
     }
-    if (scoreType === 'DEFAULT') return 2; // T (Rerata Tugas) and UH (Rerata UH)
+    if (scoreType === 'DEFAULT') return 4; // RT, RUH, STS, Overall
     return 1; // Single column (T or UH)
   };
 
@@ -174,11 +178,11 @@ export function RecapTable() {
             Rekapitulasi Nilai Siswa
           </h1>
           <p className="text-sm text-[#6B7280] mt-1">
-            Matriks Rata-Rata Nilai Tugas (T) dan Ulangan Harian (UH) Per Mata Pelajaran
+            Overall = (Rata-Rata Tugas + Rata-Rata UH + STS) / 3. Komponen kosong dihitung 0.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="outline"
             size="md"
@@ -236,9 +240,10 @@ export function RecapTable() {
             value={scoreType}
             onChange={(e) => setScoreType(e.target.value)}
             options={[
-              { value: 'DEFAULT', label: 'Default (Rerata T & UH)' },
+              { value: 'DEFAULT', label: 'RT, RUH, STS & Overall' },
               { value: 'ASSIGNMENT', label: 'Nilai Tugas (T)' },
               { value: 'DAILY_TEST', label: 'Ulangan Harian (UH)' },
+              { value: 'MIDTERM', label: 'Sumatif Tengah Semester (STS)' },
             ]}
           />
         </div>
@@ -259,7 +264,7 @@ export function RecapTable() {
             />
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-slate-700 font-bold">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-700 font-bold">
             {(scoreType === 'DEFAULT' || scoreType === 'ASSIGNMENT') && (
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#7C3AED]"></span> T / RT = Rata-Rata Tugas
@@ -347,6 +352,8 @@ export function RecapTable() {
                       )}
 
                       {/* All Subjects - Assignment Only: Shows T */}
+                      {scoreType === 'DEFAULT' && <><th className="p-2 border-r text-amber-700">STS</th><th className="p-2 border-r">Overall</th></>}
+                      {scoreType === 'MIDTERM' && <th className="p-2 border-r text-amber-700">STS</th>}
                       {scoreType === 'ASSIGNMENT' && !isDetailMode && (
                         <th
                           title="T: Rata-Rata Nilai Tugas Per Mapel"
@@ -503,6 +510,8 @@ export function RecapTable() {
                         assignmentAvg: null,
                         dailyTestAvg: null,
                         overallAvg: null,
+                        midtermScore: null,
+                        midtermPending: false,
                       };
 
                       return (
@@ -520,6 +529,8 @@ export function RecapTable() {
                           )}
 
                           {/* All Subjects Assignment Only */}
+                          {(scoreType === 'DEFAULT' || scoreType === 'MIDTERM') && <td className="p-2 text-center border-r tabular-nums text-amber-700">{scoreData.midtermPending ? 'Susulan' : formatScore(scoreData.midtermScore)}</td>}
+                          {scoreType === 'DEFAULT' && <td className="p-2 text-center border-r tabular-nums font-bold">{formatScore(scoreData.overallAvg)}</td>}
                           {scoreType === 'ASSIGNMENT' && !isDetailMode && (
                             <td className="p-2 text-center border-r border-[#E5E7EB] font-mono tabular-nums font-semibold text-[#7C3AED]">
                               {formatScore(scoreData.assignmentAvg)}

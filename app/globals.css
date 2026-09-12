@@ -29,6 +29,34 @@ body {
   border: 1px solid #CBD5E1;
 }
 
+.mobile-navigation {
+  margin: 0;
+  width: min(20rem, 90vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0 0 env(safe-area-inset-bottom);
+  border: 0;
+  background: white;
+}
+
+.mobile-navigation::backdrop { background: rgb(15 23 42 / 45%); }
+body:has(.mobile-navigation[open]) { overflow: hidden; }
+
+/* Shared table wrappers contain wide data grids inside the available viewport. */
+.overflow-x-auto { min-width: 0; max-width: 100%; }
+.grid > * { min-width: 0; }
+
+/* Existing modal panels remain reachable with a short viewport or open keyboard. */
+.fixed.inset-0 > div {
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+@media (max-width: 639px) {
+  .fixed.bottom-5.right-5 { left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); }
+}
+
 /* Utility to hide scrollbars globally while maintaining full scrollability */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

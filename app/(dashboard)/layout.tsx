@@ -37,10 +37,10 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#111827] font-sans antialiased flex flex-col">
       {/* Top Navigation Bar */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-[#E5E7EB] z-50 px-6 flex items-center justify-between shadow-xs">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-[#E5E7EB] z-50 pl-16 pr-3 lg:px-6 flex items-center justify-between gap-2 shadow-xs">
         {/* Left Branding */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#9333EA] flex items-center justify-center text-white font-bold shadow-md shadow-purple-500/20">
+          <div className="hidden sm:flex w-9 h-9 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#9333EA] items-center justify-center text-white font-bold shadow-md shadow-purple-500/20">
             <GraduationCap className="w-5 h-5" />
           </div>
           <div>
@@ -48,7 +48,7 @@ export default async function DashboardLayout({
               <span className="text-xl font-extrabold tracking-tight text-[#7C3AED]">
                 Rapotin
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F3E8FF] text-[#7C3AED]">
+              <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F3E8FF] text-[#7C3AED]">
                 v1.0
               </span>
             </div>
@@ -57,12 +57,12 @@ export default async function DashboardLayout({
         </div>
 
         {/* Header Right Actions (Classroom Badge, Install App, Ganti Kelas Button, Bell, Teacher Profile) */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {/* Desktop PWA Install Button */}
-          <InstallDesktopButton />
+          <div className="hidden xl:block"><InstallDesktopButton /></div>
 
           {/* Active Classroom Badge */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#F3E8FF] rounded-full text-xs font-semibold text-[#7C3AED] border border-purple-200">
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-[#F3E8FF] rounded-full text-xs font-semibold text-[#7C3AED] border border-purple-200">
             <Calendar className="w-3.5 h-3.5" />
             <span>{classroomName} • {academicYear}</span>
           </div>
@@ -79,11 +79,11 @@ export default async function DashboardLayout({
           </Link>
 
 
-          <button className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F8FAFC] rounded-full transition-colors cursor-pointer">
+          <button aria-label="Notifikasi" className="hidden sm:block p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F8FAFC] rounded-full transition-colors cursor-pointer">
             <Bell className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-3 pl-3 border-l border-[#E5E7EB]">
+          <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-[#E5E7EB]">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-[#111827]">{teacherName}</p>
               <p className="text-[11px] text-[#6B7280]">{classroomName}</p>
@@ -101,7 +101,7 @@ export default async function DashboardLayout({
         <Sidebar />
 
         {/* Main Workstation */}
-        <main className="flex-1 ml-64 p-6 md:p-8 max-w-[1440px] min-h-[calc(100vh-4rem)] overflow-y-auto no-scrollbar">
+        <main className="min-w-0 w-full flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 max-w-[1440px] min-h-[calc(100vh-4rem)]">
           {children}
         </main>
       </div>

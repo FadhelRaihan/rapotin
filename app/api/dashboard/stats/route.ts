@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, withDbRetry } from '@/lib/db';
 import { getSession } from '@/lib/auth/session';
+import { average, overallScore } from '@/lib/scores';
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -47,23 +48,27 @@ export async function GET(request: Request) {
       })
     );
 
+    const midterms = await db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester }, include: { student: true, subject: true } });
+    const validMidterms = midterms.filter(item => !item.is_pending && item.score !== null);
+    const perSubjectOverall = (studentId: string, subjectId: string) => overallScore(
+      average(assignmentScores.filter(item => item.student_id === studentId && item.subject_id === subjectId).map(item => Number(item.score))),
+      average(dailyTestScores.filter(item => item.student_id === studentId && item.subject_id === subjectId).map(item => Number(item.score))),
+      Number(validMidterms.find(item => item.student_id === studentId && item.subject_id === subjectId)?.score ?? 0),
+    );
     // 1. Overall Metrics
     const totalStudents = students.length;
     const totalSubjects = subjects.length;
     const validAssignments = assignmentScores.filter((a) => !a.is_pending && a.score !== null);
     const validDailyTests = dailyTestScores.filter((d) => !d.is_pending && d.score !== null);
 
-    const totalScoresRecorded = validAssignments.length + validDailyTests.length;
+    const totalScoresRecorded = validAssignments.length + validDailyTests.length + validMidterms.length;
 
     const allScoresNum = [
       ...validAssignments.map((a) => Number(a.score)),
       ...validDailyTests.map((d) => Number(d.score)),
     ];
 
-    const classAverage =
-      allScoresNum.length > 0
-        ? allScoresNum.reduce((acc, curr) => acc + curr, 0) / allScoresNum.length
-        : 0;
+    const classAverage = average(students.map(student => average(subjects.map(subject => perSubjectOverall(student.id, subject.id)))));
 
     // 2. Subject Progress Stats
     const subjectProgress = subjects.map((subject) => {
@@ -80,16 +85,15 @@ export async function GET(request: Request) {
           ? subDailyTests.reduce((acc, c) => acc + Number(c.score), 0) / subDailyTests.length
           : 0;
 
-      let overallAvg = 0;
-      if (assignmentAvg > 0 && dailyTestAvg > 0) overallAvg = (assignmentAvg + dailyTestAvg) / 2;
-      else if (assignmentAvg > 0) overallAvg = assignmentAvg;
-      else if (dailyTestAvg > 0) overallAvg = dailyTestAvg;
+      const midtermAvg = average(students.map(student => Number(validMidterms.find(item => item.student_id === student.id && item.subject_id === subject.id)?.score ?? 0)));
+      const overallAvg = average(students.map(student => perSubjectOverall(student.id, subject.id)));
 
       return {
         subjectName: subject.name,
         assignmentAvg: Math.round(assignmentAvg * 10) / 10,
         dailyTestAvg: Math.round(dailyTestAvg * 10) / 10,
         overallAvg: Math.round(overallAvg * 10) / 10,
+        midtermAvg: Math.round(midtermAvg * 10) / 10,
       };
     });
 
@@ -103,6 +107,7 @@ export async function GET(request: Request) {
       const stPendingUh = dailyTestScores.filter((d) => d.student_id === student.id && d.is_pending);
 
       const pendingItems = [
+        ...midterms.filter(item => item.student_id === student.id && item.is_pending).map(item => ({ type: 'STS', subjectName: item.subject.name, label: 'STS' })),
         ...stPendingAsg.map((a) => ({
           type: 'Tugas',
           subjectName: a.subject.name,
@@ -116,14 +121,12 @@ export async function GET(request: Request) {
       ];
 
       const stScores = [
+        ...validMidterms.filter(item => item.student_id === student.id).map(item => Number(item.score)),
         ...stValidAsg.map((a) => Number(a.score)),
         ...stValidUh.map((d) => Number(d.score)),
       ];
 
-      const avg =
-        stScores.length > 0
-          ? stScores.reduce((acc, curr) => acc + curr, 0) / stScores.length
-          : 0;
+      const avg = average(subjects.map(subject => perSubjectOverall(student.id, subject.id)));
 
       return {
         studentId: student.id,
@@ -174,6 +177,7 @@ export async function GET(request: Request) {
 
     // 4. Recent Activities (Last 5 records with valid scores)
     const recentActivities = [
+      ...validMidterms.map(item => ({ id: item.id, type: 'STS', label: 'STS', studentName: item.student.full_name, subjectName: item.subject.name, score: Number(item.score), date: item.recorded_at })),
       ...validAssignments.map((a) => ({
         id: a.id,
         type: 'Tugas',

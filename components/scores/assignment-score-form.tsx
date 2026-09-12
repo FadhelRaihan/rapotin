@@ -387,7 +387,7 @@ export function AssignmentScoreForm({
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center p-1 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl w-fit">
+        <div className="flex flex-wrap items-center p-1 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl w-fit max-w-full">
           <button
             type="button"
             onClick={() => setActiveTab('batch')}

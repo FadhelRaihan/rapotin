@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,11 +10,22 @@ import {
   FileText,
   BarChart3,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    dialog.current?.close();
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => { if (desktop.matches) dialog.current?.close(); };
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, [pathname]);
 
   const menuItems = [
     {
@@ -30,13 +41,14 @@ export function Sidebar() {
       items: [
         { label: 'Nilai Tugas', href: '/nilai/tugas', icon: FileText },
         { label: 'Ulangan Harian', href: '/nilai/ulangan-harian', icon: FileText },
+        { label: 'Nilai STS', href: '/nilai/sts', icon: FileText },
         { label: 'Rekapitulasi Nilai', href: '/rekap', icon: BarChart3 },
       ],
     },
   ];
 
-  return (
-    <aside className="w-64 fixed top-16 bottom-0 left-0 bg-white border-r border-[#E5E7EB] flex flex-col justify-between p-4 z-30 overflow-y-auto no-scrollbar">
+  const navigation = (
+    <>
       <div className="flex flex-col gap-5">
         {menuItems.map((group, gIdx) => (
           <div key={gIdx} className="flex flex-col gap-1.5">
@@ -51,6 +63,8 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => dialog.current?.close()}
                   className={cn(
                     'flex items-center gap-3 px-3.5 py-2.5 rounded-md text-sm transition-all duration-150',
                     isActive
@@ -77,6 +91,29 @@ export function Sidebar() {
           </button>
         </form>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <button type="button" aria-label="Buka menu navigasi" aria-haspopup="dialog" aria-controls="mobile-navigation"
+        onClick={() => dialog.current?.showModal()}
+        className="fixed top-2 left-2 z-[60] flex h-12 w-12 items-center justify-center rounded-lg bg-white text-[#7C3AED] focus-visible:outline focus-visible:outline-2 lg:hidden">
+        <Menu className="h-6 w-6" />
+      </button>
+      <aside aria-label="Navigasi utama" className="hidden lg:flex w-64 fixed top-16 bottom-0 left-0 bg-white border-r border-[#E5E7EB] flex-col justify-between p-4 z-30 overflow-y-auto">
+        {navigation}
+      </aside>
+      <dialog ref={dialog} id="mobile-navigation" aria-label="Menu navigasi" className="mobile-navigation"
+        onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+        <nav className="flex min-h-full flex-col justify-between gap-6 p-4" aria-label="Navigasi utama">
+          <div className="flex items-center justify-between font-bold text-[#7C3AED]">
+            Menu Rapotin
+            <button type="button" aria-label="Tutup menu navigasi" onClick={() => dialog.current?.close()} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-purple-50"><X /></button>
+          </div>
+          {navigation}
+        </nav>
+      </dialog>
+    </>
   );
 }

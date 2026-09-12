@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { average, overallScore } from '../lib/scores';
+import { midtermBatchSchema, midtermFields } from '../lib/validations/midterm.schema';
+
+assert.equal(overallScore(80, 0, 90), 170 / 3);
+assert.equal(overallScore(90, 90, 90), 90);
+assert.equal(overallScore(0, 0, 0), 0);
+assert.equal(average([0, 100]), 50);
+const student_id = '11111111-1111-4111-8111-111111111111';
+const body = { subject_id: student_id, semester: 'I', recorded_at: '2026-09-12', multiple_choice_count: 30, essay_count: 5, scores: [{ student_id, score: 0 }] };
+assert.ok(midtermBatchSchema.safeParse(body).success);
+assert.ok(midtermBatchSchema.safeParse({ ...body, scores: [{ student_id, score: null }] }).success);
+assert.ok(!midtermBatchSchema.safeParse({ ...body, scores: [...body.scores, ...body.scores] }).success);
+assert.ok(!midtermBatchSchema.safeParse({ ...body, scores: [{ student_id, score: 101 }] }).success);
+assert.ok(!midtermBatchSchema.safeParse({ ...body, recorded_at: 'invalid' }).success);
+console.log('STS checks passed');
+assert.equal(midtermBatchSchema.parse(body).short_answer_count, 0);
+for (const count of [0, 10, 100]) assert.equal(midtermBatchSchema.parse({ ...body, short_answer_count: count }).short_answer_count, count);
+for (const count of [-1, 1.5, 101, '10']) assert.ok(!midtermBatchSchema.safeParse({ ...body, short_answer_count: count }).success);
+assert.equal(midtermFields.parse({ ...body, score: 85 }).short_answer_count, undefined);
+assert.equal(midtermFields.parse({ ...body, score: 85, short_answer_count: 10 }).short_answer_count, 10);

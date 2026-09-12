@@ -115,7 +115,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right Side: PIN Verification Form */}
-        <div className="p-8 md:p-12 flex flex-col justify-between gap-6 bg-white">
+        <div className="min-w-0 p-5 sm:p-8 md:p-10 flex flex-col justify-between gap-6 bg-white">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <div className="w-10 h-10 rounded-xl bg-[#F3E8FF] text-[#7C3AED] flex items-center justify-center font-bold mb-1">

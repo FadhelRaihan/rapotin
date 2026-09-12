@@ -61,6 +61,7 @@ model Student {
   classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
   assignment_scores AssignmentScore[]
   daily_test_scores DailyTestScore[]
+  midterm_scores MidtermScore[]
 
   @@map("students")
 }
@@ -74,6 +75,7 @@ model Subject {
   classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
   assignment_scores AssignmentScore[]
   daily_test_scores DailyTestScore[]
+  midterm_scores MidtermScore[]
 
   @@map("subjects")
 }
@@ -112,4 +114,23 @@ model DailyTestScore {
   subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
 
   @@map("daily_test_scores")
+}
+
+model MidtermScore {
+  id String @id @default(uuid())
+  student_id String
+  subject_id String
+  semester String
+  score Decimal? @db.Decimal(5, 2)
+  is_pending Boolean @default(false)
+  multiple_choice_count Int? @default(0)
+  short_answer_count Int? @default(0)
+  essay_count Int? @default(0)
+  recorded_at DateTime @db.Date
+  created_at DateTime @default(now())
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, subject_id, semester])
+  @@map("midterm_scores")
 }
