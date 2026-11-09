@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { average, overallScore } from '../lib/scores';
+import { average, overallScore, summativeScore } from '../lib/scores';
 import { midtermBatchSchema, midtermFields } from '../lib/validations/midterm.schema';
 
-assert.equal(overallScore(80, 0, 90), 170 / 3);
-assert.equal(overallScore(90, 90, 90), 90);
-assert.equal(overallScore(0, 0, 0), 0);
+assert.equal(summativeScore(90.6, 78, 91), (90.6 + 78 + 91) / 3);
+assert.equal(overallScore(90.6, 90.6, 78, 91), (90.6 + (90.6 + 78 + 91) / 3) / 2);
+assert.equal(overallScore(90, 90, 90, 90), 90);
+assert.equal(overallScore(0, 0, 0, 0), 0);
 assert.equal(average([0, 100]), 50);
 const student_id = '11111111-1111-4111-8111-111111111111';
 const body = { subject_id: student_id, semester: 'I', recorded_at: '2026-09-12', multiple_choice_count: 30, essay_count: 5, scores: [{ student_id, score: 0 }] };

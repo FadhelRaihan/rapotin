@@ -9,6 +9,7 @@ import {
   BookOpen,
   FileText,
   BarChart3,
+  Printer,
   LogOut,
   Menu,
   X,
@@ -42,7 +43,9 @@ export function Sidebar() {
         { label: 'Nilai Tugas', href: '/nilai/tugas', icon: FileText },
         { label: 'Ulangan Harian', href: '/nilai/ulangan-harian', icon: FileText },
         { label: 'Nilai STS', href: '/nilai/sts', icon: FileText },
+        { label: 'Nilai SAS', href: '/nilai/sas', icon: FileText },
         { label: 'Rekapitulasi Nilai', href: '/rekap', icon: BarChart3 },
+        { label: 'Cetak Rapor', href: '/rapor', icon: Printer },
       ],
     },
   ];
@@ -98,7 +101,7 @@ export function Sidebar() {
     <>
       <button type="button" aria-label="Buka menu navigasi" aria-haspopup="dialog" aria-controls="mobile-navigation"
         onClick={() => dialog.current?.showModal()}
-        className="fixed top-2 left-2 z-[60] flex h-12 w-12 items-center justify-center rounded-lg bg-white text-[#7C3AED] focus-visible:outline focus-visible:outline-2 lg:hidden">
+        className="fixed top-2 left-2 z-[60] flex h-12 w-12 items-center justify-center rounded-lg bg-white text-[#7C3AED] focus-visible:outline focus-visible:outline-2 lg:hidden print:hidden">
         <Menu className="h-6 w-6" />
       </button>
       <aside aria-label="Navigasi utama" className="hidden lg:flex w-64 fixed top-16 bottom-0 left-0 bg-white border-r border-[#E5E7EB] flex-col justify-between p-4 z-30 overflow-y-auto">

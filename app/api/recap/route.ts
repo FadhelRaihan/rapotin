@@ -48,11 +48,14 @@ export async function GET(request: Request) {
       })
     );
 
-    const midterms = await db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } });
+    const [midterms, finals] = await Promise.all([
+      db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } }),
+      db.finalScore.findMany({ where: { student: { classroom_id: classroomId }, semester } }),
+    ]);
     const recapData = students.map((student) => {
       const studentSubjectScores: Record<
         string,
-        { assignmentAvg: number; dailyTestAvg: number; midtermScore: number | null; midtermPending: boolean; finalScore: number }
+        { assignmentAvg: number; dailyTestAvg: number; midtermScore: number | null; midtermPending: boolean; finalExamScore: number | null; finalExamPending: boolean; finalScore: number }
       > = {};
 
       let totalFinalScores = 0;
@@ -80,7 +83,9 @@ export async function GET(request: Request) {
 
         const midterm = midterms.find(item => item.student_id === student.id && item.subject_id === subject.id);
         const midtermScore = midterm && !midterm.is_pending && midterm.score !== null ? Number(midterm.score) : null;
-        const finalScore = overallScore(assignmentAvg, dailyTestAvg, midtermScore ?? 0);
+        const finalExam = finals.find(item => item.student_id === student.id && item.subject_id === subject.id);
+        const finalExamScore = finalExam && !finalExam.is_pending && finalExam.score !== null ? Number(finalExam.score) : null;
+        const finalScore = overallScore(assignmentAvg, dailyTestAvg, midtermScore ?? 0, finalExamScore ?? 0);
         totalFinalScores += finalScore;
         subjectCountWithScores++;
 
@@ -89,6 +94,8 @@ export async function GET(request: Request) {
           dailyTestAvg: Math.round(dailyTestAvg * 10) / 10,
           midtermScore,
           midtermPending: midterm?.is_pending ?? false,
+          finalExamScore,
+          finalExamPending: finalExam?.is_pending ?? false,
           finalScore: Math.round(finalScore * 10) / 10,
         };
       });
@@ -109,6 +116,7 @@ export async function GET(request: Request) {
       assignments: assignmentScores,
       dailyTests: dailyTestScores,
       midterms,
+      finals,
       recap: recapData,
     });
   } catch (error) {

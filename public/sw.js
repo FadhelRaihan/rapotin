@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rapotin-v1';
+const CACHE_NAME = 'rapotin-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -42,8 +42,13 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Skip API routes or non-HTTP protocols
-  if (url.pathname.startsWith('/api') || !url.protocol.startsWith('http')) {
+  // Skip API routes, Next.js dev chunks, or non-HTTP protocols
+  if (
+    url.pathname.startsWith('/api') ||
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    !url.protocol.startsWith('http')
+  ) {
     return;
   }
 

@@ -41,10 +41,11 @@ model Classroom {
   academic_year String
   created_at    DateTime @default(now())
 
-  school   School    @relation(fields: [school_id], references: [id], onDelete: Cascade)
-  teacher  Teacher   @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
-  students Student[]
-  subjects Subject[]
+  school              School                  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher             Teacher                 @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  students            Student[]
+  subjects            Subject[]
+  report_configs      ClassroomReportConfig[]
 
   @@map("classrooms")
 }
@@ -58,10 +59,14 @@ model Student {
   gender       String?  // "L" atau "P"
   created_at   DateTime @default(now())
 
-  classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
-  assignment_scores AssignmentScore[]
-  daily_test_scores DailyTestScore[]
-  midterm_scores MidtermScore[]
+  classroom               Classroom                @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
+  assignment_scores       AssignmentScore[]
+  daily_test_scores       DailyTestScore[]
+  midterm_scores          MidtermScore[]
+  final_scores            FinalScore[]
+  report_details          StudentReportDetail[]
+  extracurricular_scores  ExtracurricularScore[]
+  competency_descriptions CompetencyDescription[]
 
   @@map("students")
 }
@@ -72,46 +77,48 @@ model Subject {
   name         String
   created_at   DateTime @default(now())
 
-  classroom         Classroom          @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
-  assignment_scores AssignmentScore[]
-  daily_test_scores DailyTestScore[]
-  midterm_scores MidtermScore[]
+  classroom               Classroom                @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
+  assignment_scores       AssignmentScore[]
+  daily_test_scores       DailyTestScore[]
+  midterm_scores          MidtermScore[]
+  final_scores            FinalScore[]
+  competency_descriptions CompetencyDescription[]
 
   @@map("subjects")
 }
 
 model AssignmentScore {
-  id          String   @id @default(uuid())
-  student_id  String
-  subject_id  String
-  semester    String   // "I" atau "II"
-  label       String
-  score       Decimal? @db.Decimal(5, 2)
-  is_pending  Boolean  @default(false)
-  recorded_at DateTime @db.Date
-  created_at  DateTime @default(now())
+  id                    String             @id @default(uuid())
+  student_id            String
+  subject_id            String
+  semester              String             // "I" atau "II"
+  label                 String
+  score                 Decimal?           @db.Decimal(5, 2)
+  is_pending            Boolean            @default(false)
+  recorded_at           DateTime           @db.Date
+  created_at            DateTime           @default(now())
 
-  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
-  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  student            Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject            Subject            @relation(fields: [subject_id], references: [id], onDelete: Cascade)
 
   @@map("assignment_scores")
 }
 
 model DailyTestScore {
-  id                    String   @id @default(uuid())
+  id                    String             @id @default(uuid())
   student_id            String
   subject_id            String
-  semester              String   // "I" atau "II"
+  semester              String             // "I" atau "II"
   label                 String
-  score                 Decimal? @db.Decimal(5, 2)
-  is_pending            Boolean  @default(false)
-  multiple_choice_count Int?     @default(0)
-  essay_count           Int?     @default(0)
-  recorded_at           DateTime @db.Date
-  created_at            DateTime @default(now())
+  score                 Decimal?           @db.Decimal(5, 2)
+  is_pending            Boolean            @default(false)
+  multiple_choice_count Int?               @default(0)
+  essay_count           Int?               @default(0)
+  recorded_at           DateTime           @db.Date
+  created_at            DateTime           @default(now())
 
-  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
-  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  student            Student            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject            Subject            @relation(fields: [subject_id], references: [id], onDelete: Cascade)
 
   @@map("daily_test_scores")
 }
@@ -133,4 +140,106 @@ model MidtermScore {
 
   @@unique([student_id, subject_id, semester])
   @@map("midterm_scores")
+}
+
+model FinalScore {
+  id String @id @default(uuid())
+  student_id String
+  subject_id String
+  semester String
+  score Decimal? @db.Decimal(5, 2)
+  is_pending Boolean @default(false)
+  multiple_choice_count Int? @default(0)
+  short_answer_count Int? @default(0)
+  essay_count Int? @default(0)
+  recorded_at DateTime @db.Date
+  created_at DateTime @default(now())
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, subject_id, semester])
+  @@map("final_scores")
+}
+
+model StudentReportDetail {
+  id              String   @id @default(uuid())
+  student_id      String
+  semester        String   // "I" atau "II"
+  sickness_days   Int      @default(0)
+  permission_days Int      @default(0)
+  unexcused_days  Int      @default(0)
+  teacher_note    String?  // Catatan wali kelas
+  p5_note         String?  // Catatan projek penguatan profil pelajar pancasila (kokurikuler)
+  parent_response String?  // Tanggapan orang tua / wali murid
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, semester])
+  @@map("student_report_details")
+}
+
+model ExtracurricularScore {
+  id                String   @id @default(uuid())
+  student_id        String
+  semester          String   // "I" atau "II"
+  name              String   // e.g. "Pramuka"
+  score_description String   // e.g. "Sangat Baik, aktif dan mandiri dalam kegiatan"
+  created_at        DateTime @default(now())
+
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@map("extracurricular_scores")
+}
+
+model ClassroomReportConfig {
+  id              String   @id @default(uuid())
+  classroom_id    String
+  semester        String   // "I" atau "II"
+  report_date     String   // e.g. "22 Desember 2025"
+  report_place    String   @default("Tarumajaya")
+  headmaster_name String   // e.g. "H. SUHANDA, S.Pd"
+  headmaster_nip  String?  // e.g. "19721202199603002"
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroom_id], references: [id], onDelete: Cascade)
+
+  @@unique([classroom_id, semester])
+  @@map("classroom_report_configs")
+}
+
+model CompetencyDescription {
+  id            String   @id @default(uuid())
+  student_id    String
+  subject_id    String
+  semester      String   // "I" atau "II"
+  highest_desc  String   // Narasi kompetensi tertinggi
+  lowest_desc   String?  // Narasi kompetensi terendah (opsional jika semua nilai maksimal)
+  is_customized Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  student Student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, subject_id, semester])
+  @@map("competency_descriptions")
+}
+
+model MasterLearningObjective {
+  id           String   @id @default(uuid())
+  subject_name String   // Nama mapel standar: e.g. "Matematika", "IPAS", "Bahasa Indonesia"
+  grade_level  Int      @default(6) // Tingkat kelas: 1 - 6
+  semester     String   // "I" atau "II"
+  code         String   // e.g. "TP 1", "TP 2"
+  description  String   // Teks capaian pembelajaran standar pemerintah (BSKAP)
+  topic        String?  // Judul lingkup materi / bab terkait
+  order_index  Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@unique([subject_name, grade_level, semester, code])
+  @@map("master_learning_objectives")
 }

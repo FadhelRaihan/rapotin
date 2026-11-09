@@ -70,9 +70,16 @@ export async function GET(request: Request) {
       })
     );
 
-    const midterms = await db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } });
+    const [midterms, finals] = await Promise.all([
+      db.midtermScore.findMany({ where: { student: { classroom_id: classroomId }, semester } }),
+      db.finalScore.findMany({ where: { student: { classroom_id: classroomId }, semester } }),
+    ]);
     const stsValue = (studentId: string, subjectId: string) => {
       const item = midterms.find(score => score.student_id === studentId && score.subject_id === subjectId);
+      return item && !item.is_pending ? Number(item.score) : 0;
+    };
+    const sasValue = (studentId: string, subjectId: string) => {
+      const item = finals.find(score => score.student_id === studentId && score.subject_id === subjectId);
       return item && !item.is_pending ? Number(item.score) : 0;
     };
     students.sort((a, b) => a.full_name.localeCompare(b.full_name, 'id', { sensitivity: 'base' }) || a.id.localeCompare(b.id));
@@ -171,14 +178,17 @@ export async function GET(request: Request) {
     // ==========================================
     // MODE 1: EXPORT ALL SUBJECTS IN 1 SEMESTER
     // ==========================================
-    if (mode === '5') {
-      const ws = workbook.addWorksheet('Rekap STS');
-      applyStandardHeaderAndFreeze(ws, 'NILAI STS', `Semester ${semester}`);
-      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', ...subjects.map(subject => subject.name), 'Rata-Rata STS', 'Ranking'];
+    if (mode === '5' || mode === '6') {
+      const isSas = mode === '6';
+      const labelExam = isSas ? 'SAS' : 'STS';
+      const sourceScores = isSas ? finals : midterms;
+      const ws = workbook.addWorksheet(`Rekap ${labelExam}`);
+      applyStandardHeaderAndFreeze(ws, `NILAI ${labelExam}`, `Semester ${semester}`);
+      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', ...subjects.map(subject => subject.name), `Rata-Rata ${labelExam}`, 'Ranking'];
       styleTableHeader(ws.getRow(6));
       const rows = students.map(student => {
         const values = subjects.map(subject => {
-          const item = midterms.find(score => score.student_id === student.id && score.subject_id === subject.id);
+          const item = sourceScores.find(score => score.student_id === student.id && score.subject_id === subject.id);
           return item && !item.is_pending && item.score !== null ? Number(item.score) : null;
         });
         const filled = values.filter((value): value is number => value !== null);
@@ -221,7 +231,7 @@ export async function GET(request: Request) {
           'Rerata Tugas',
           ...uniqueUhLabels.map((_, i) => `UH${i + 1}`),
           'Rerata UH',
-          'STS', 'Overall',
+          'STS', 'SAS', 'Overall',
         ];
 
         ws.getRow(6).values = headerValues;
@@ -252,7 +262,7 @@ export async function GET(request: Request) {
               ? validUhs.reduce((a, b) => a + b, 0) / validUhs.length
               : 0;
 
-          const overallAvg = overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id));
+          const overallAvg = overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id), sasValue(student.id, subject.id));
 
           return {
             student,
@@ -277,7 +287,7 @@ export async function GET(request: Request) {
             item.asgAvg,
             ...item.uhScores.map((v) => (v !== null ? v : '-')),
             item.uhAvg,
-            stsValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
+            stsValue(item.student.id, subject.id), sasValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
           ];
 
           const row = ws.addRow(rowValues);
@@ -293,7 +303,7 @@ export async function GET(request: Request) {
           ...uniqueAsgLabels.map(() => ({ width: 10 })),
           { width: 14 },
           ...uniqueUhLabels.map(() => ({ width: 10 })),
-          { width: 14 }, { width: 14 },
+          { width: 14 }, { width: 14 }, { width: 14 },
           { width: 14 },
         ];
       });
@@ -328,7 +338,7 @@ export async function GET(request: Request) {
         'Rerata Tugas',
         ...uniqueUhLabels.map((_, i) => `UH${i + 1}`),
         'Rerata UH',
-        'STS', 'Overall',
+        'STS', 'SAS', 'Overall',
       ];
 
       ws.getRow(6).values = headerValues;
@@ -359,7 +369,7 @@ export async function GET(request: Request) {
           asgAvg: Math.round(asgAvg * 10) / 10,
           uhScores,
           uhAvg: Math.round(uhAvg * 10) / 10,
-          overallAvg: overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id)),
+          overallAvg: overallScore(asgAvg, uhAvg, stsValue(student.id, subject.id), sasValue(student.id, subject.id)),
         };
       });
 
@@ -375,7 +385,7 @@ export async function GET(request: Request) {
           item.asgAvg,
           ...item.uhScores.map((v) => (v !== null ? v : '-')),
           item.uhAvg,
-          stsValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
+          stsValue(item.student.id, subject.id), sasValue(item.student.id, subject.id), Math.round(item.overallAvg * 10) / 10,
         ];
 
         const row = ws.addRow(rowValues);
@@ -390,7 +400,7 @@ export async function GET(request: Request) {
         ...uniqueAsgLabels.map(() => ({ width: 10 })),
         { width: 14 },
         ...uniqueUhLabels.map(() => ({ width: 10 })),
-        { width: 14 }, { width: 14 },
+        { width: 14 }, { width: 14 }, { width: 14 },
         { width: 14 },
       ];
     }
@@ -398,15 +408,18 @@ export async function GET(request: Request) {
     // =========================================================================
     // MODE 3: EXPORT BY SUBJECT & SCORE TYPE -> MULTIPLE SHEETS PER TASK/UH
     // =========================================================================
-    else if ((mode === '3' || mode === '4') && scoreType === 'MIDTERM') {
+    else if ((mode === '3' || mode === '4') && (scoreType === 'MIDTERM' || scoreType === 'FINAL')) {
+      const isSas = scoreType === 'FINAL';
+      const labelExam = isSas ? 'SAS' : 'STS';
+      const sourceScores = isSas ? finals : midterms;
       const subject = subjects.find(item => item.id === subjectId);
-      if (!subject) return NextResponse.json({ error: 'Pilih mata pelajaran STS' }, { status: 400 });
-      const ws = workbook.addWorksheet('STS');
-      applyStandardHeaderAndFreeze(ws, `REKAP NILAI STS ${subject.name}`, `Semester ${semester}`);
-      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', 'STS', 'Status', 'Tanggal'];
+      if (!subject) return NextResponse.json({ error: `Pilih mata pelajaran ${labelExam}` }, { status: 400 });
+      const ws = workbook.addWorksheet(labelExam);
+      applyStandardHeaderAndFreeze(ws, `REKAP NILAI ${labelExam} ${subject.name}`, `Semester ${semester}`);
+      ws.getRow(6).values = ['No', 'NIS / NISN', 'Nama Siswa', 'L/P', labelExam, 'Status', 'Tanggal'];
       styleTableHeader(ws.getRow(6));
       students.forEach((student, index) => {
-        const item = midterms.find(score => score.student_id === student.id && score.subject_id === subject.id);
+        const item = sourceScores.find(score => score.student_id === student.id && score.subject_id === subject.id);
         const row = ws.addRow([index + 1, student.nisn || student.nis, student.full_name, student.gender || '-', item && !item.is_pending ? Number(item.score) : '-', !item ? 'Kosong' : item.is_pending ? 'Susulan' : 'Terisi', item?.recorded_at.toISOString().slice(0, 10) ?? '-']);
         styleDataRow(row, index);
       });

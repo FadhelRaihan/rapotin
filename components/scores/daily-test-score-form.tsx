@@ -58,6 +58,7 @@ interface DailyTestScoreFormProps {
   subjects: Subject[];
   initialScores: DailyTestScore[];
   midterm?: boolean;
+  finalExam?: boolean;
 }
 
 export function DailyTestScoreForm({
@@ -65,10 +66,12 @@ export function DailyTestScoreForm({
   subjects,
   initialScores,
   midterm = false,
+  finalExam = false,
 }: DailyTestScoreFormProps) {
   const router = useRouter();
-  const assessment = midterm ? 'STS' : 'UH';
-  const assessmentName = midterm ? 'Sumatif Tengah Semester' : 'Ulangan Harian';
+  const isSingleExam = midterm || finalExam;
+  const assessment = finalExam ? 'SAS' : midterm ? 'STS' : 'UH';
+  const assessmentName = finalExam ? 'Sumatif Akhir Semester' : midterm ? 'Sumatif Tengah Semester' : 'Ulangan Harian';
   const [activeTab, setActiveTab] = useState<'batch' | 'history' | 'pending'>('batch');
   const [scores, setScores] = useState<DailyTestScore[]>(initialScores);
 
@@ -76,7 +79,7 @@ export function DailyTestScoreForm({
   const [batchHeader, setBatchHeader] = useState({
     subject_id: subjects[0]?.id || '',
     semester: 'I',
-    label: midterm ? 'STS' : '',
+    label: isSingleExam ? assessment : '',
     multiple_choice_count: '',
     short_answer_count: '',
     essay_count: '',
@@ -114,9 +117,9 @@ export function DailyTestScoreForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const batchStudents = midterm ? students.filter(student => !scores.some(score => score.student_id === student.id && score.subject_id === batchHeader.subject_id && score.semester === batchHeader.semester)) : students;
-  const normalizeMidterm = (item: any): DailyTestScore => ({ ...item, label: 'STS', score: item.score === null ? null : Number(item.score), student: students.find(student => student.id === item.student_id)!, subject: subjects.find(subject => subject.id === item.subject_id)! });
-  const scoreUrl = (id: string) => midterm ? `/api/midterm-scores/${id}` : `/api/scores/daily-test/${id}`;
+  const batchStudents = isSingleExam ? students.filter(student => !scores.some(score => score.student_id === student.id && score.subject_id === batchHeader.subject_id && score.semester === batchHeader.semester)) : students;
+  const normalizeSingleExam = (item: any): DailyTestScore => ({ ...item, label: assessment, score: item.score === null ? null : Number(item.score), student: students.find(student => student.id === item.student_id)!, subject: subjects.find(subject => subject.id === item.subject_id)! });
+  const scoreUrl = (id: string) => finalExam ? `/api/final-scores/${id}` : midterm ? `/api/midterm-scores/${id}` : `/api/scores/daily-test/${id}`;
   const updateBody = (item: DailyTestScore, score: number | null) => ({ score, recorded_at: item.recorded_at.slice(0, 10), multiple_choice_count: item.multiple_choice_count ?? 0, short_answer_count: item.short_answer_count ?? 0, essay_count: item.essay_count ?? 0 });
 
   const openEditHistoryModal = (scoreItem: DailyTestScore) => {
@@ -145,9 +148,9 @@ export function DailyTestScoreForm({
       }
 
       const res = await fetch(scoreUrl(editingHistoryScore.id), {
-        method: midterm ? 'PATCH' : 'PUT',
+        method: isSingleExam ? 'PATCH' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(midterm ? updateBody(editingHistoryScore, numScore) : {
+        body: JSON.stringify(isSingleExam ? updateBody(editingHistoryScore, numScore) : {
           score: numScore,
           label: editFormData.label,
           semester: editFormData.semester,
@@ -160,7 +163,7 @@ export function DailyTestScoreForm({
       }
 
       setScores((prev) =>
-        prev.map((s) => (s.id === editingHistoryScore.id ? midterm ? { ...s, score: numScore, is_pending: numScore === null } : data.score : s))
+        prev.map((s) => (s.id === editingHistoryScore.id ? isSingleExam ? { ...s, score: numScore, is_pending: numScore === null } : data.score : s))
       );
       setEditingHistoryScore(null);
       setSuccessMsg(`Nilai ${assessment} berhasil diperbarui.`);
@@ -278,21 +281,21 @@ export function DailyTestScoreForm({
     setLoading(true);
 
     try {
-      const res = await fetch(midterm ? '/api/midterm-scores' : '/api/scores/daily-test/batch', {
+      const res = await fetch(finalExam ? '/api/final-scores' : midterm ? '/api/midterm-scores' : '/api/scores/daily-test/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...batchHeader,
-          multiple_choice_count: batchHeader.multiple_choice_count ? Number(batchHeader.multiple_choice_count) : midterm ? 0 : null,
-          ...(midterm ? { short_answer_count: Number(batchHeader.short_answer_count || 0) } : {}),
-          essay_count: batchHeader.essay_count ? Number(batchHeader.essay_count) : midterm ? 0 : null,
+          multiple_choice_count: batchHeader.multiple_choice_count ? Number(batchHeader.multiple_choice_count) : isSingleExam ? 0 : null,
+          ...(isSingleExam ? { short_answer_count: Number(batchHeader.short_answer_count || 0) } : {}),
+          essay_count: batchHeader.essay_count ? Number(batchHeader.essay_count) : isSingleExam ? 0 : null,
           scores: scoresPayload,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Gagal menyimpan nilai ${assessment}`);
-      if (midterm) { data.savedScores = data.data.map(normalizeMidterm); data.filledCount = data.savedScores.filter((item: DailyTestScore) => !item.is_pending).length; }
+      if (isSingleExam) { data.savedScores = data.data.map(normalizeSingleExam); data.filledCount = data.savedScores.filter((item: DailyTestScore) => !item.is_pending).length; }
 
       if (data.savedScores && data.savedScores.length > 0) {
         setScores((prev) => [...data.savedScores, ...prev]);
@@ -312,7 +315,7 @@ export function DailyTestScoreForm({
         label: batchHeader.label,
       });
 
-      setBatchHeader((prev) => ({ ...prev, label: midterm ? 'STS' : '', multiple_choice_count: '', short_answer_count: '', essay_count: '' }));
+      setBatchHeader((prev) => ({ ...prev, label: isSingleExam ? assessment : '', multiple_choice_count: '', short_answer_count: '', essay_count: '' }));
       setActiveTab('history');
       router.refresh();
     } catch (err: any) {
@@ -337,9 +340,9 @@ export function DailyTestScoreForm({
 
     try {
       const res = await fetch(scoreUrl(scoreId), {
-        method: midterm ? 'PATCH' : 'PUT',
+        method: isSingleExam ? 'PATCH' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(midterm ? updateBody(scores.find(item => item.id === scoreId)!, num) : { score: num }),
+        body: JSON.stringify(isSingleExam ? updateBody(scores.find(item => item.id === scoreId)!, num) : { score: num }),
       });
 
       const data = await res.json();
@@ -463,7 +466,7 @@ export function DailyTestScoreForm({
                   1. Informasi {assessmentName} ({assessment}) Yang Akan Dinilai
                 </h2>
                 <p className="text-xs text-[#6B7280]">
-                  {midterm ? 'Pilih mata pelajaran dan semester. Satu STS per siswa, mapel, dan semester; nilai tercatat tersedia di Riwayat atau Susulan.' : 'Pilih mata pelajaran dan tentukan label UH 1x untuk seluruh kelas'}
+                  {isSingleExam ? `Pilih mata pelajaran dan semester. Satu ${assessment} per siswa, mapel, dan semester; nilai tercatat tersedia di Riwayat atau Susulan.` : 'Pilih mata pelajaran dan tentukan label UH 1x untuk seluruh kelas'}
                 </p>
               </div>
             </div>
@@ -472,7 +475,7 @@ export function DailyTestScoreForm({
               <Select
                 label="Mata Pelajaran *"
                 value={batchHeader.subject_id}
-                onChange={(e) => { setBatchHeader({ ...batchHeader, subject_id: e.target.value }); if (midterm) { setScoreMap({}); setScoreErrors({}); } }}
+                onChange={(e) => { setBatchHeader({ ...batchHeader, subject_id: e.target.value }); if (isSingleExam) { setScoreMap({}); setScoreErrors({}); } }}
                 options={subjects.map((sub) => ({
                   value: sub.id,
                   label: sub.name,
@@ -483,7 +486,7 @@ export function DailyTestScoreForm({
               <Select
                 label="Semester *"
                 value={batchHeader.semester}
-                onChange={(e) => { setBatchHeader({ ...batchHeader, semester: e.target.value }); if (midterm) { setScoreMap({}); setScoreErrors({}); } }}
+                onChange={(e) => { setBatchHeader({ ...batchHeader, semester: e.target.value }); if (isSingleExam) { setScoreMap({}); setScoreErrors({}); } }}
                 options={[
                   { value: 'I', label: 'Semester I' },
                   { value: 'II', label: 'Semester II' },
@@ -498,7 +501,7 @@ export function DailyTestScoreForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              {!midterm && <Input
+              {!isSingleExam && <Input
                 label="Nama / Label UH *"
                 placeholder="Misal: Ulangan Harian 1 Bab Pecahan"
                 value={batchHeader.label}
@@ -514,7 +517,7 @@ export function DailyTestScoreForm({
                 value={batchHeader.multiple_choice_count}
                 onChange={(e) => setBatchHeader({ ...batchHeader, multiple_choice_count: e.target.value })}
               />
-              {midterm && <Input
+              {isSingleExam && <Input
                 label="Jumlah Soal Isian Singkat (Opsional)"
                 type="number"
                 min={0}
@@ -581,7 +584,7 @@ export function DailyTestScoreForm({
                   {batchStudents.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-[#6B7280] text-xs">
-                        {midterm && students.length ? 'STS sudah tercatat. Gunakan Riwayat Nilai atau Nilai Susulan untuk memperbarui.' : 'Belum ada siswa di kelas ini. Silakan tambah siswa di menu Data Siswa.'}
+                        {isSingleExam && students.length ? `${assessment} sudah tercatat. Gunakan Riwayat Nilai atau Nilai Susulan untuk memperbarui.` : 'Belum ada siswa di kelas ini. Silakan tambah siswa di menu Data Siswa.'}
                       </td>
                     </tr>
                   ) : (
@@ -699,7 +702,7 @@ export function DailyTestScoreForm({
                 ]}
               />
 
-              {!midterm && <Select
+              {!isSingleExam && <Select
                 value={historyFilter.label}
                 onChange={(e) => setHistoryFilter({ ...historyFilter, label: e.target.value })}
                 options={[
@@ -738,7 +741,7 @@ export function DailyTestScoreForm({
                     <th className="p-4 w-12 text-center">No</th>
                     <th className="p-4">Nama Siswa</th>
                     <th className="p-4">Mata Pelajaran</th>
-                    <th className="p-4">{midterm ? 'Penilaian' : 'Label UH'}</th>
+                    <th className="p-4">{isSingleExam ? 'Penilaian' : 'Label UH'}</th>
                     <th className="p-4 text-center">Detail Soal</th>
                     <th className="p-4 text-center">Semester</th>
                     <th className="p-4 text-center">Nilai (0-100)</th>
@@ -770,9 +773,9 @@ export function DailyTestScoreForm({
                           {score.label}
                         </td>
                         <td className="p-4 text-center text-xs text-[#6B7280]">
-                          {score.multiple_choice_count || (midterm && score.short_answer_count) || score.essay_count ? (
+                          {score.multiple_choice_count || (isSingleExam && score.short_answer_count) || score.essay_count ? (
                             <span className="font-mono text-[11px]">
-                              {[score.multiple_choice_count ? `${score.multiple_choice_count} PG` : '', midterm && score.short_answer_count ? `${score.short_answer_count} Isian Singkat` : '', score.essay_count ? `${score.essay_count} Essay` : ''].filter(Boolean).join(' • ')}
+                              {[score.multiple_choice_count ? `${score.multiple_choice_count} PG` : '', isSingleExam && score.short_answer_count ? `${score.short_answer_count} Isian Singkat` : '', score.essay_count ? `${score.essay_count} Essay` : ''].filter(Boolean).join(' • ')}
                             </span>
                           ) : (
                             '-'
@@ -834,7 +837,7 @@ export function DailyTestScoreForm({
                   <th className="p-4 w-12 text-center">No</th>
                   <th className="p-4">Nama Siswa</th>
                   <th className="p-4">Mata Pelajaran</th>
-                  <th className="p-4">{midterm ? 'Penilaian' : 'Label UH'}</th>
+                  <th className="p-4">{isSingleExam ? 'Penilaian' : 'Label UH'}</th>
                   <th className="p-4 text-center">Semester</th>
                   <th className="p-4 w-52">Input Nilai Susulan</th>
                   <th className="p-4 text-right">Aksi</th>
@@ -946,7 +949,7 @@ export function DailyTestScoreForm({
                 </strong>
               </div>
 
-              {!midterm && <Input
+              {!isSingleExam && <Input
                 label="Judul / Label UH *"
                 value={editFormData.label}
                 onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
@@ -955,7 +958,7 @@ export function DailyTestScoreForm({
 
               <Select
                 label="Semester *"
-                disabled={midterm}
+                disabled={isSingleExam}
                 value={editFormData.semester}
                 onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
                 options={[

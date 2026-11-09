@@ -53,7 +53,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/siswa') ||
     pathname.startsWith('/mapel') ||
     pathname.startsWith('/nilai') ||
-    pathname.startsWith('/rekap');
+    pathname.startsWith('/rekap') ||
+    pathname.startsWith('/rapor');
 
   if (isDashboardRoute) {
     if (!isValidSession) {
@@ -68,5 +69,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/login', '/kelas', '/dashboard/:path*', '/siswa/:path*', '/mapel/:path*', '/nilai/:path*', '/rekap/:path*'],
+  matcher: ['/login', '/kelas', '/dashboard/:path*', '/siswa/:path*', '/mapel/:path*', '/nilai/:path*', '/rekap/:path*', '/rapor/:path*'],
 };

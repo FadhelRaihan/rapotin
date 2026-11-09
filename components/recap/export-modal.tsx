@@ -52,9 +52,9 @@ export function ExportModal({
 }: ExportModalProps) {
   const [step, setStep] = useState<'CONFIG' | 'CONFIRMATION'>('CONFIG');
   const [selectedSemester, setSelectedSemester] = useState<string>(semester);
-  const [exportMode, setExportMode] = useState<'1' | '2' | '3' | '4' | '5'>('1');
+  const [exportMode, setExportMode] = useState<'1' | '2' | '3' | '4' | '5' | '6'>('1');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
-  const [scoreType, setScoreType] = useState<'ASSIGNMENT' | 'DAILY_TEST' | 'MIDTERM'>('ASSIGNMENT');
+  const [scoreType, setScoreType] = useState<'ASSIGNMENT' | 'DAILY_TEST' | 'MIDTERM' | 'FINAL'>('ASSIGNMENT');
   const [selectedLabel, setSelectedLabel] = useState<string>('');
 
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -67,7 +67,7 @@ export function ExportModal({
   // Extract available unique labels for Mode 4
   const availableLabels = Array.from(
     new Set(
-      scoreType === 'MIDTERM' ? ['STS'] : scoreType === 'ASSIGNMENT'
+      scoreType === 'MIDTERM' ? ['STS'] : scoreType === 'FINAL' ? ['SAS'] : scoreType === 'ASSIGNMENT'
         ? assignments
             .filter((a) => a.subject_id === selectedSubjectId && a.semester === selectedSemester)
             .map((a) => a.label)
@@ -84,7 +84,7 @@ export function ExportModal({
     params.set('mode', exportMode);
     params.set('semester', selectedSemester);
 
-    if (exportMode !== '1' && exportMode !== '5') {
+    if (exportMode !== '1' && exportMode !== '5' && exportMode !== '6') {
       params.set('subjectId', selectedSubjectId || subjects[0]?.id || '');
     }
 
@@ -108,6 +108,7 @@ export function ExportModal({
 
   // Helper to get human-readable data description for Step 2 Confirmation
   const getExportSummaryText = () => {
+    if (exportMode === '6') return `Rekap SAS semua mata pelajaran — Semester ${selectedSemester}. Nama A–Z; rata-rata dari nilai terisi; tanpa nilai: rata-rata dan ranking “-”. Nilai sama mendapat ranking sama (1, 1, 3).`;
     if (exportMode === '5') return `Rekap STS semua mata pelajaran — Semester ${selectedSemester}. Nama A–Z; rata-rata dari nilai terisi; tanpa nilai: rata-rata dan ranking “-”. Nilai sama mendapat ranking sama (1, 1, 3).`;
     if (exportMode === '1') {
       return `Seluruh Data Rekapitulasi Nilai 1 Semester (${subjects.length} Mata Pelajaran) - Semester ${selectedSemester}`;
@@ -117,13 +118,13 @@ export function ExportModal({
     }
     if (exportMode === '3') {
       return `Daftar Nilai ${
-        scoreType === 'MIDTERM' ? 'STS' : scoreType === 'ASSIGNMENT' ? 'Seluruh Tugas' : 'Seluruh Ulangan Harian (UH)'
+        scoreType === 'FINAL' ? 'SAS' : scoreType === 'MIDTERM' ? 'STS' : scoreType === 'ASSIGNMENT' ? 'Seluruh Tugas' : 'Seluruh Ulangan Harian (UH)'
       } Mata Pelajaran "${selectedSubjectObj?.name || ''}" - Semester ${selectedSemester} (Sheet Per Judul)`;
     }
     if (exportMode === '4') {
       const activeLabel = selectedLabel || availableLabels[0] || 'Tugas / UH';
       return `Nilai ${
-        scoreType === 'MIDTERM' ? 'STS' : scoreType === 'ASSIGNMENT' ? 'Tugas' : 'Ulangan Harian'
+        scoreType === 'FINAL' ? 'SAS' : scoreType === 'MIDTERM' ? 'STS' : scoreType === 'ASSIGNMENT' ? 'Tugas' : 'Ulangan Harian'
       } "${activeLabel}" - Mata Pelajaran "${selectedSubjectObj?.name || ''}" (Semester ${selectedSemester})`;
     }
     return '';
@@ -314,11 +315,15 @@ export function ExportModal({
                   <input type="radio" name="exportMode" checked={exportMode === '5'} onChange={() => setExportMode('5')} className="mt-0.5 text-[#7C3AED]" />
                   <span className="flex flex-col"><span className="text-xs font-bold text-[#111827]">5. Rekap STS Semua Mata Pelajaran</span><span className="text-[11px] text-[#6B7280]">Satu sheet: identitas siswa, nilai tiap mapel, rata-rata STS, ranking. Urutan nama A–Z.</span></span>
                 </label>
+                <label className={cn('p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all', exportMode === '6' ? 'border-[#7C3AED] bg-[#F3E8FF]/30 shadow-xs' : 'border-[#E5E7EB] bg-white hover:border-purple-200')}>
+                  <input type="radio" name="exportMode" checked={exportMode === '6'} onChange={() => setExportMode('6')} className="mt-0.5 text-[#7C3AED]" />
+                  <span className="flex flex-col"><span className="text-xs font-bold text-[#111827]">6. Rekap SAS Semua Mata Pelajaran</span><span className="text-[11px] text-[#6B7280]">Satu sheet: identitas siswa, nilai tiap mapel, rata-rata SAS, ranking. Urutan nama A–Z.</span></span>
+                </label>
               </div>
             </div>
 
             {/* Dynamic Parameter Options */}
-            {exportMode !== '1' && exportMode !== '5' && (
+            {exportMode !== '1' && exportMode !== '5' && exportMode !== '6' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E5E7EB]">
                 <Select
                   label="Pilih Mata Pelajaran *"
@@ -334,11 +339,12 @@ export function ExportModal({
                   <Select
                     label="Pilih Jenis Nilai *"
                     value={scoreType}
-                    onChange={(e) => setScoreType(e.target.value as 'ASSIGNMENT' | 'DAILY_TEST' | 'MIDTERM')}
+                    onChange={(e) => setScoreType(e.target.value as 'ASSIGNMENT' | 'DAILY_TEST' | 'MIDTERM' | 'FINAL')}
                     options={[
                       { value: 'ASSIGNMENT', label: 'Nilai Tugas (T)' },
                       { value: 'DAILY_TEST', label: 'Ulangan Harian (UH)' },
                       { value: 'MIDTERM', label: 'STS (satu nilai per semester)' },
+                      { value: 'FINAL', label: 'SAS (satu nilai per semester)' },
                     ]}
                   />
                 )}

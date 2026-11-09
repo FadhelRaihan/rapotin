@@ -46,6 +46,8 @@ export interface RecapMatrix {
       overallAvg: number | null;
       midtermScore: number | null;
       midtermPending: boolean;
+      finalExamScore: number | null;
+      finalExamPending: boolean;
     };
   };
 }
@@ -90,6 +92,8 @@ export function RecapTable() {
             overallAvg: scores?.finalScore ?? 0,
             midtermScore: scores?.midtermScore ?? null,
             midtermPending: scores?.midtermPending ?? false,
+            finalExamScore: scores?.finalExamScore ?? null,
+            finalExamPending: scores?.finalExamPending ?? false,
           };
         });
       });
@@ -156,8 +160,8 @@ export function RecapTable() {
     if (isDetailMode) {
       return detailLabels.length + 1; // individual items + average column (RT / RUH)
     }
-    if (scoreType === 'DEFAULT') return 4; // RT, RUH, STS, Overall
-    return 1; // Single column (T or UH)
+    if (scoreType === 'DEFAULT') return 5; // RT, RUH, STS, SAS, Overall
+    return 1; // Single column (T, UH, STS, or SAS)
   };
 
   const colSpanPerSubject = getColSpan();
@@ -178,7 +182,7 @@ export function RecapTable() {
             Rekapitulasi Nilai Siswa
           </h1>
           <p className="text-sm text-[#6B7280] mt-1">
-            Overall = (Rata-Rata Tugas + Rata-Rata UH + STS) / 3. Komponen kosong dihitung 0.
+            Overall = (Rata-Rata Tugas + ((Rata-Rata UH + STS + SAS) / 3)) / 2. Komponen kosong dihitung 0.
           </p>
         </div>
 
@@ -240,10 +244,11 @@ export function RecapTable() {
             value={scoreType}
             onChange={(e) => setScoreType(e.target.value)}
             options={[
-              { value: 'DEFAULT', label: 'RT, RUH, STS & Overall' },
+              { value: 'DEFAULT', label: 'RT, RUH, STS, SAS & Overall' },
               { value: 'ASSIGNMENT', label: 'Nilai Tugas (T)' },
               { value: 'DAILY_TEST', label: 'Ulangan Harian (UH)' },
               { value: 'MIDTERM', label: 'Sumatif Tengah Semester (STS)' },
+              { value: 'FINAL', label: 'Sumatif Akhir Semester (SAS)' },
             ]}
           />
         </div>
@@ -352,8 +357,9 @@ export function RecapTable() {
                       )}
 
                       {/* All Subjects - Assignment Only: Shows T */}
-                      {scoreType === 'DEFAULT' && <><th className="p-2 border-r text-amber-700">STS</th><th className="p-2 border-r">Overall</th></>}
+                      {scoreType === 'DEFAULT' && <><th className="p-2 border-r text-amber-700">STS</th><th className="p-2 border-r text-blue-700">SAS</th><th className="p-2 border-r">Overall</th></>}
                       {scoreType === 'MIDTERM' && <th className="p-2 border-r text-amber-700">STS</th>}
+                      {scoreType === 'FINAL' && <th className="p-2 border-r text-blue-700">SAS</th>}
                       {scoreType === 'ASSIGNMENT' && !isDetailMode && (
                         <th
                           title="T: Rata-Rata Nilai Tugas Per Mapel"
@@ -512,6 +518,8 @@ export function RecapTable() {
                         overallAvg: null,
                         midtermScore: null,
                         midtermPending: false,
+                        finalExamScore: null,
+                        finalExamPending: false,
                       };
 
                       return (
@@ -530,6 +538,7 @@ export function RecapTable() {
 
                           {/* All Subjects Assignment Only */}
                           {(scoreType === 'DEFAULT' || scoreType === 'MIDTERM') && <td className="p-2 text-center border-r tabular-nums text-amber-700">{scoreData.midtermPending ? 'Susulan' : formatScore(scoreData.midtermScore)}</td>}
+                          {(scoreType === 'DEFAULT' || scoreType === 'FINAL') && <td className="p-2 text-center border-r tabular-nums text-blue-700">{scoreData.finalExamPending ? 'Susulan' : formatScore(scoreData.finalExamScore)}</td>}
                           {scoreType === 'DEFAULT' && <td className="p-2 text-center border-r tabular-nums font-bold">{formatScore(scoreData.overallAvg)}</td>}
                           {scoreType === 'ASSIGNMENT' && !isDetailMode && (
                             <td className="p-2 text-center border-r border-[#E5E7EB] font-mono tabular-nums font-semibold text-[#7C3AED]">

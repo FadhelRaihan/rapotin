@@ -62,6 +62,7 @@ interface DashboardStats {
     assignmentAvg: number;
     dailyTestAvg: number;
     midtermAvg: number;
+    finalExamAvg: number;
     overallAvg: number;
   }[];
   gradeDistribution: {
@@ -215,7 +216,7 @@ export function DashboardView() {
             <span className="text-3xl font-bold text-[#111827] font-mono tabular-nums">
               {loading ? '-' : data?.summary.totalScoresRecorded || 0}
             </span>
-            <span className="text-[11px] text-[#6B7280]">Tugas, UH & STS Terekam</span>
+            <span className="text-[11px] text-[#6B7280]">Tugas, UH, STS & SAS Terekam</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
             <FileText className="w-6 h-6" />
@@ -233,7 +234,7 @@ export function DashboardView() {
                 <Sparkles className="w-5 h-5 text-[#7C3AED]" /> Progres Nilai per Mata Pelajaran
               </h2>
               <p className="text-xs text-[#6B7280] mt-0.5">
-                Rata-Rata Tugas, UH & STS per Mapel (Semester {semester})
+                Rata-Rata Tugas, UH, STS & SAS per Mapel (Semester {semester})
               </p>
             </div>
           </div>
@@ -266,6 +267,7 @@ export function DashboardView() {
                   <Bar dataKey="assignmentAvg" name="Rata-Rata Tugas" fill="#7C3AED" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="dailyTestAvg" name="Rata-Rata UH" fill="#10B981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="midtermAvg" name="Rata-Rata STS" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="finalExamAvg" name="Rata-Rata SAS" fill="#2563EB" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
